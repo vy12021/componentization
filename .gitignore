@@ -1,0 +1,17 @@
+*.iml
+.idea/
+.settings/
+*.project
+*.classpath
+
+build
+repo
+
+.vscode/
+.externalNativeBuild/
+
+.gradle/
+
+*.properties
+!gradle.properties
+!gradle-wrapper.properties

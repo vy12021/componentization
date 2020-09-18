@@ -1,0 +1,7 @@
+include ':app'
+include ':annotation'
+include ':compiler'
+include ':componentization'
+include ':plugin'
+
+rootProject.name = 'componentization-parent'

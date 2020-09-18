@@ -1,0 +1,12 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
+
+android {
+
+}
+
+dependencies {
+  implementation project(':annotation')
+  annotationProcessor project(':compiler')
+}

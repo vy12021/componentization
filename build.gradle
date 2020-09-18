@@ -1,0 +1,129 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+  repositories {
+    google()
+    jcenter()
+    mavenCentral()
+    gradlePluginPortal()
+  }
+  dependencies {
+    classpath 'com.android.tools.build:gradle:4.0.1'
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.10"
+    // classpath "net.ltgt.gradle:gradle-errorprone-plugin:1.1.1"
+  }
+}
+
+ext {
+
+  minSdkVersion = 21
+  targetSdkVersion = 28
+  compileSdkVersion = 29
+  buildToolsVersion = '29.0.3'
+
+  applicationId = "com.bhb.android.componentization"
+  versionName = "1.0.0"
+  versionCode = 100000000
+
+  sourceCompatibilityVersion = JavaVersion.VERSION_1_8
+  targetCompatibilityVersion = JavaVersion.VERSION_1_8
+
+}
+
+subprojects {
+
+  repositories {
+    google()
+    jcenter()
+    mavenCentral()
+  }
+
+  afterEvaluate {
+    def plugins = getPlugins()
+    def androidLibrary = plugins.hasPlugin('com.android.library')
+    def androidApp = plugins.hasPlugin('com.android.application')
+    def kotlinSupport = plugins.hasPlugin('kotlin-kapt')
+
+    if (!(androidLibrary || androidApp)) {
+      sourceCompatibility = rootProject.ext.sourceCompatibilityVersion
+      targetCompatibility = rootProject.ext.targetCompatibilityVersion
+      return
+    }
+
+    dependencies {
+      api fileTree(dir: "${project.projectDir}/libs", include: ['*.jar'])
+      implementation 'androidx.appcompat:appcompat:1.2.0'
+      implementation 'androidx.annotation:annotation:1.1.0'
+      testImplementation 'junit:junit:4.13'
+      androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+      androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+    }
+
+    if (kotlinSupport) {
+      kapt {
+        useBuildCache = true
+      }
+    }
+
+    android {
+      compileSdkVersion rootProject.ext.compileSdkVersion
+      buildToolsVersion rootProject.ext.buildToolsVersion
+      defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        if (androidApp) {
+          applicationId rootProject.ext.applicationId
+          versionCode rootProject.ext.versionCode
+          versionName rootProject.ext.versionName
+        }
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+      }
+      sourceSets {
+        main {
+          java.srcDirs += ['src/main/kotlin']
+          jni.srcDirs = ['src/main/cpp']
+          jniLibs.srcDirs += ['libs']
+        }
+      }
+      dexOptions {
+        preDexLibraries true
+      }
+      aaptOptions {
+        cruncherEnabled false
+      }
+      compileOptions {
+        sourceCompatibility rootProject.ext.sourceCompatibilityVersion
+        targetCompatibility rootProject.ext.targetCompatibilityVersion
+      }
+      if (kotlinSupport) {
+        kotlinOptions {
+          freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
+          jvmTarget = '1.8'
+        }
+      }
+      lintOptions {
+        abortOnError false
+      }
+      testOptions {
+        unitTests.returnDefaultValues = true
+      }
+      packagingOptions {
+        exclude 'META-INF/DEPENDENCIES.txt'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/dependencies.txt'
+        exclude 'META-INF/LGPL2.1'
+      }
+    }
+  }
+
+}
+
+task clean(type: Delete) {
+  delete rootProject.buildDir
+}
