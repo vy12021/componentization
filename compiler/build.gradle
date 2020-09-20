@@ -16,9 +16,6 @@ dependencies {
 
   implementation 'net.ltgt.gradle.incap:incap:0.2'
   annotationProcessor 'net.ltgt.gradle.incap:incap-processor:0.2'
-
-  testImplementation 'junit:junit:4.13'
-  testImplementation 'com.google.truth:truth:1.0'
 }
 
 
