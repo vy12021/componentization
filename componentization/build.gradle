@@ -22,8 +22,8 @@ android {
 dependencies {
   implementation project(':annotation')
   testImplementation 'junit:junit:4.13'
-  testImplementation 'com.google.truth:truth:1.0'
-  testImplementation 'com.google.testing.compile:compile-testing:0.15'
+  testImplementation 'com.google.truth:truth:1.0.1'
+  testImplementation 'com.google.testing.compile:compile-testing:0.18'
   testImplementation files(getRuntimeJar())
   testImplementation files(Jvm.current().getToolsJar())
   testImplementation project(':compiler')

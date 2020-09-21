@@ -9,15 +9,13 @@ import javax.tools.JavaFileObject;
 import static com.google.common.truth.Truth.assertAbout;
 import static com.google.testing.compile.JavaSourceSubjectFactory.javaSource;
 
-class ComponentTest {
+public class ComponentTest {
 
   @Test
   public void generateComponents() {
     JavaFileObject source = JavaFileObjects.forSourceString("test.Test", ""
             + "package test;\n"
-            + "import android.view.View;\n"
             + "import com.bhb.android.componentization.Component;\n"
-            + "import com.bhb.android.componentization.AutoWired;\n"
             + "@Component\n"
             + "public class Test {\n"
             + "    \n"

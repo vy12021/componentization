@@ -18,6 +18,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
+import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.Processor;
 import javax.annotation.processing.RoundEnvironment;
@@ -26,6 +27,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Types;
+import javax.tools.Diagnostic;
 
 /**
  * Created by Tesla on 2019/12/20.
@@ -38,11 +40,13 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private Types typeUtils;
   private Filer filer;
   private @Nullable Trees trees;
+  private Messager logger;
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
     super.init(env);
     typeUtils = env.getTypeUtils();
+    logger = env.getMessager();
     filer = env.getFiler();
     try {
       trees = Trees.instance(processingEnv);
@@ -80,28 +84,31 @@ public final class ComponentizationProcessor extends AbstractProcessor {
 
   private Set<Class<? extends Annotation>> getSupportedAnnotations() {
     Set<Class<? extends Annotation>> annotations = new LinkedHashSet<>();
+    annotations.add(Component.class);
     annotations.add(AutoWired.class);
     return annotations;
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
-    TypeSpec.Builder typeBuilder = TypeSpec.classBuilder("TestClass");
-    for (Element element : env.getElementsAnnotatedWith(AutoWired.class)) {
+    for (Element element : env.getElementsAnnotatedWith(Component.class)) {
       if (!SuperficialValidation.validateElement(element)) continue;
+      TypeSpec spec = build(element);
       try {
-
-      } finally {
+        JavaFile file = JavaFile.builder("a.b.c", spec)
+                .addFileComment("%s").build();
+        file.writeTo(filer);
+      } catch (Exception e) {
+        logger.printMessage(Diagnostic.Kind.ERROR, e.getMessage());
+        return false;
       }
     }
-    JavaFile file = JavaFile.builder("a.b.c", typeBuilder.build())
-            .addFileComment("%s").build();
-    try {
-      file.writeTo(filer);
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
     return false;
+  }
+
+  private TypeSpec build(Element element) {
+    return TypeSpec.classBuilder("")
+            .build();
   }
 
 }
