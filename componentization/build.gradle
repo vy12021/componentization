@@ -20,7 +20,7 @@ android {
 }
 
 dependencies {
-  implementation project(':annotation')
+  api project(':annotation')
   testImplementation 'junit:junit:4.13'
   testImplementation 'com.google.truth:truth:1.0.1'
   testImplementation 'com.google.testing.compile:compile-testing:0.18'

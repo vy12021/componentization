@@ -84,14 +84,14 @@ public final class ComponentizationProcessor extends AbstractProcessor {
 
   private Set<Class<? extends Annotation>> getSupportedAnnotations() {
     Set<Class<? extends Annotation>> annotations = new LinkedHashSet<>();
-    annotations.add(Component.class);
+    annotations.add(Service.class);
     annotations.add(AutoWired.class);
     return annotations;
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
-    for (Element element : env.getElementsAnnotatedWith(Component.class)) {
+    for (Element element : env.getElementsAnnotatedWith(Service.class)) {
       if (!SuperficialValidation.validateElement(element)) continue;
       TypeSpec spec = build(element);
       try {

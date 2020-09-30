@@ -6,10 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 定义组件声明，组件会被进行自动注册
- * Created by Tesla on 2020/09/18.
+ * api接口声明注解，实现类必须被标记{@link Service}标记才可实现自动注册
+ * Created by Tesla on 2020/09/22.
  */
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.TYPE)
-public @interface Component {
+public @interface Api {
 }
