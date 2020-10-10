@@ -1,21 +1,22 @@
 package com.bhb.android.componentization
 
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import com.bhb.android.componentization.library.AppAPI
 
 class MainActivity: AppCompatActivity() {
 
-  @AutoWired(lazy = true)
-  lateinit var funAAPI: FunAAPI
+  @CAutoWired(lazy = true)
+  lateinit var funAAPI: AppAPI
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    Componentization.register()
+    funAAPI = Componentization.getComponents()[AppAPI::class.java] as AppAPI
     setContentView(R.layout.main_activity)
     findViewById<View>(android.R.id.content).setOnClickListener {
-      Componentization.register()
-      Log.e("MainActivity", "=====")
+      funAAPI.mustImplInApp(applicationContext)
     }
   }
 

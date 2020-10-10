@@ -1,8 +1,14 @@
-apply plugin: 'groovy'
+apply plugin: 'java-gradle-plugin'
+apply plugin: 'kotlin'
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
 
 dependencies {
-  implementation gradleApi()
-  implementation localGroovy()
+  compileOnly gradleApi()
+  compileOnly 'com.android.tools.build:gradle:4.0.1'
+  implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.4.10'
+  implementation 'org.javassist:javassist:3.27.0-GA'
 }
 
 apply from: "${rootProject.file('mvn-push.gradle')}"

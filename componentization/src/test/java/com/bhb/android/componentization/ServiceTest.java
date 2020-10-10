@@ -13,32 +13,35 @@ public class ServiceTest {
 
   @Test
   public void componentCollect() {
-    JavaFileObject source = JavaFileObjects.forSourceString("com.bhb.android.module.Test", ""
+    JavaFileObject source = JavaFileObjects.forSourceString("test.TestService", ""
             + "package test;\n"
-            + "import com.bhb.android.componentization.Component;\n"
-            + "import com.bhb.android.componentization.Api;\n"
-            + "@Component\n"
-            + "public class TestService implements TestService.TestAPI {\n"
+            + "import java.lang.Override;\n"
+            + "import com.bhb.android.componentization.CService;\n"
+            + "import com.bhb.android.componentization.TestAPI;\n"
+            + "@CService\n"
+            + "public class TestService implements TestAPI {\n"
 
-            + "  public void doSomething() {\n"
+            + "  @Override public void doSomething() {\n"
             + "    \n"
             + "  }\n"
 
-            + "  @Api\n"
-            + "  public interface TestAPI {\n"
-            + "    void doSomething();\n"
-            + "  }\n"
             + "}"
     );
 
-    JavaFileObject bindingSource = JavaFileObjects.forSourceString("com.bhb.android.componentization/Test_ComponentBinding", ""
-            + "package com.bhb.android.componentization;\n"
+    JavaFileObject bindingSource = JavaFileObjects.forSourceString("com.bhb.android.componentization/Test_Register", ""
+            + "package test;\n"
+            + "import android.util.Pair;\n"
             + "import java.lang.Override;\n"
+            + "import test.TestService;\n"
+            + "import com.bhb.android.componentization.API;\n"
+            + "import com.bhb.android.componentization.ComponentRegister;\n"
+            + "import com.bhb.android.componentization.TestAPI;\n"
             + "public class Test_Register implements ComponentRegister {\n"
-
-            + "  public Map< \n"
-
-            + "\n"
+            + "  @Override public ComponentRegister.Item register() {\n"
+            + "    final ArrayList<Class<? extends API> apis = new ArrayList<>(1);\n"
+            + "    apis.add(TestAPI.class);\n"
+            + "    return ComponentRegister.Item(apis, TestService.class);\n"
+            + "  }\n"
             + "}"
     );
 

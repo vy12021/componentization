@@ -1,11 +1,6 @@
 package com.bhb.android.componentization;
 
-import android.util.Log;
-
-import java.io.IOException;
-import java.net.URL;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,7 +19,21 @@ public class Componentization {
    * 注册所有收集到的组件
    */
   public static void register() {
+  }
 
+  /**
+   * 执行指定组件器
+   */
+  public static void register(Class<? extends ComponentRegister> registerType) {
+    try {
+      ComponentRegister.Item registerItem = registerType.newInstance().register();
+      API instance = registerItem.service.newInstance();
+      for (Class<? extends API> api : registerItem.apis) {
+        sComponents.put(api, instance);
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
   }
 
   /**

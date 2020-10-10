@@ -12,6 +12,4 @@ repo
 
 .gradle/
 
-*.properties
-!gradle.properties
-!gradle-wrapper.properties
+local.properties

@@ -1,15 +1,30 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
+  ext {
+    kotlin_version = '1.4.10'
+  }
   repositories {
     google()
     jcenter()
     mavenCentral()
     gradlePluginPortal()
+    maven {
+      name "plugin"
+      url "https://nexus.bhbcode.com/repository/android-plugin/"
+      credentials {
+        username mavenUsername
+        password mavenPassword
+      }
+      authentication {
+        basic(BasicAuthentication)
+      }
+    }
   }
   dependencies {
     classpath 'com.android.tools.build:gradle:4.0.1'
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.10"
+    classpath 'com.bhb.android.plugin:componentization:0.1.22'
     // classpath "net.ltgt.gradle:gradle-errorprone-plugin:1.1.1"
   }
 }
