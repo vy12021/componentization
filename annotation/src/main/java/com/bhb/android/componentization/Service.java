@@ -6,10 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * api接口声明注解，实现类必须被标记{@link CService}标记才可实现自动注册
- * Created by Tesla on 2020/09/22.
+ * 组件实现声明，最终以父接口形式注册，接口必须包含{@link Api}声明才会生效
+ * Created by Tesla on 2020/09/18.
  */
-@Retention(RetentionPolicy.CLASS)
+@Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface CApi {
+public @interface Service {
 }

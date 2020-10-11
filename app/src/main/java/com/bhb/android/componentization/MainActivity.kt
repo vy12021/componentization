@@ -7,16 +7,18 @@ import com.bhb.android.componentization.library.AppAPI
 
 class MainActivity: AppCompatActivity() {
 
-  @CAutoWired(lazy = true)
+  @AutoWired(lazy = true)
   lateinit var funAAPI: AppAPI
+  @AutoWired
+  lateinit var contextAPI: ContextAPI
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    Componentization.register()
-    funAAPI = Componentization.getComponents()[AppAPI::class.java] as AppAPI
+    funAAPI = Componentization.get(AppAPI::class.java)
+    contextAPI = Componentization.get(ContextAPI::class.java)
     setContentView(R.layout.main_activity)
     findViewById<View>(android.R.id.content).setOnClickListener {
-      funAAPI.mustImplInApp(applicationContext)
+      contextAPI.toast("It's ContextAPI")
     }
   }
 

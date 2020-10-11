@@ -103,15 +103,15 @@ public final class ComponentizationProcessor extends AbstractProcessor {
 
   private Set<Class<? extends Annotation>> getSupportedAnnotations() {
     Set<Class<? extends Annotation>> annotations = new LinkedHashSet<>();
-    annotations.add(CApi.class);
-    annotations.add(CService.class);
-    annotations.add(CAutoWired.class);
+    annotations.add(Api.class);
+    annotations.add(Service.class);
+    annotations.add(AutoWired.class);
     return annotations;
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
-    for (Element element : env.getElementsAnnotatedWith(CService.class)) {
+    for (Element element : env.getElementsAnnotatedWith(Service.class)) {
       if (!SuperficialValidation.validateElement(element)) {
         continue;
       }
@@ -145,7 +145,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     List<Type> interfaces = ((Symbol.ClassSymbol) element).getInterfaces();
     List<Type> apisType = new ArrayList<>(interfaces.size());
     for (Type itf : interfaces) {
-      if (null != itf.asElement().getAnnotation(CApi.class)) {
+      if (null != itf.asElement().getAnnotation(Api.class)) {
         boolean isAPIType = false;
         for (Type sitf : ((Symbol.ClassSymbol) itf.tsym).getInterfaces()) {
           if (APIType.toString().equals(sitf.toString())) {

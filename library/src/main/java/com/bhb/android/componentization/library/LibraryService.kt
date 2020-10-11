@@ -1,8 +1,8 @@
 package com.bhb.android.componentization.library
 
-import com.bhb.android.componentization.CService
+import com.bhb.android.componentization.Service
 
-@CService
+@Service
 object LibraryService: LibraryAPI {
   override fun showLibrary() {
 

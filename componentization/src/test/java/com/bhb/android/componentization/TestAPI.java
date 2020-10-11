@@ -1,6 +1,6 @@
 package com.bhb.android.componentization;
 
-@CApi
+@Api
 public interface TestAPI /*extends API */{
   void doSomething();
 }

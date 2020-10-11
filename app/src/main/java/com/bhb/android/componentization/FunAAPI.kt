@@ -1,4 +1,4 @@
 package com.bhb.android.componentization
 
-@CApi
+@Api
 interface FunAAPI: API {}
