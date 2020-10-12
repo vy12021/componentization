@@ -25,6 +25,24 @@ public class Componentization {
   private static Map<Class<? extends API>, API> sComponents;
 
   /**
+   * 手动注册
+   * @param api     api
+   * @param service service实例
+   */
+  public static void register(Class<? extends API> api, Class<? extends API> service) {
+    sComponentProvider.put(api, service);
+  }
+
+  /**
+   * 手动注册
+   * @param api     api
+   * @param service service实例
+   */
+  public static void register(Class<? extends API> api, API service) {
+    sComponents.put(api, service);
+  }
+
+  /**
    * 执行指定组件器
    */
   private static void register(Class<? extends ComponentRegister> register) {

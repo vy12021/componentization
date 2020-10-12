@@ -56,7 +56,7 @@ class ComponentScanner: Transform() {
     transformInvocation.inputs.forEach input@{ input ->
       input.jarInputs.forEach jarInput@{ jarInput ->
         if (jarInput.status == Status.REMOVED) {
-          return
+          return@jarInput
         }
         classPool.appendClassPath(jarInput.file.absolutePath)
         if (null == componentizationJarInput && null != classPool.getOrNull(COMPONENTIZATION)) {
@@ -74,37 +74,38 @@ class ComponentScanner: Transform() {
     if (null == componentizationJarInput) {
       throw RuntimeException("没有查找到组件工具：$COMPONENTIZATION")
     }
-    try {
-      inputs.forEach input@{input ->
-        println("找到资源：${input.file.absolutePath}")
-        if (input is JarInput) {
-          if (input.file.name == "classes.jar") {
-            val transformClasses = transformComponentsFromJar(classPool, input)
-            if (transformClasses.isNotEmpty()) {
-              repackageJar(classPool, input, transformClasses)
+    inputs.forEach input@{input ->
+      println("找到资源：${input.file.absolutePath}")
+      if (input is JarInput) {
+        val jarOutput = getOutput(input)
+        if (input.file.name == "classes.jar") {
+          transformComponentsFromJar(classPool, input).apply {
+            if (false && isNotEmpty()) {
+              repackageJar(classPool, input,  jarOutput, this)
               return@input
             }
           }
-          input.file.copyTo(getOutput(input))
-        } else if (input is DirectoryInput) {
-          val dirOutput = getOutput(input)
-          // 目录先copy，然后覆盖被修改的类
-          input.file.copyRecursively(dirOutput)
-          // 兼容java的classes目录和kotlin的kotlin-classes目录
-          if (input.file.name == "classes" || input.file.parentFile.name == "kotlin-classes") {
-            println("transformComponentsFromDir: ${input.file.absolutePath} -> ${dirOutput.absolutePath}")
-            transformComponentsFromDir(classPool, input).forEach {clazz ->
-              clazz.writeFile(dirOutput.absolutePath)
-              println("\twrite class: ${clazz.name}")
-            }
+        }
+        input.file.copyTo(jarOutput)
+      } else if (input is DirectoryInput) {
+        val dirOutput = getOutput(input)
+        // 目录先copy，然后覆盖被修改的类
+        input.file.copyRecursively(dirOutput)
+        // 兼容java的classes目录和kotlin的kotlin-classes目录
+        if (input.file.name == "classes" || input.file.parentFile.name == "kotlin-classes") {
+          println("transformComponentsFromDir: ${input.file.absolutePath} -> ${dirOutput.absolutePath}")
+          transformComponentsFromDir(classPool, input).forEach { clazz ->
+            clazz.writeFile(dirOutput.absolutePath)
+            println("\twrite class: ${clazz.name}")
           }
         }
       }
-    } catch (e: Exception) {
-      throw e
     }
     // checkRegisterValid(classPool)
-    transformComponentizationJar(classPool, componentizationJarInput!!)
+    componentizationJarInput!!.apply {
+      /*repackageJar(classPool, this, getOutput(this),
+              listOf(transformComponentizationJar(classPool, this)))*/
+    }
     println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
     classPool.clearImportedPackages()
   }
@@ -214,7 +215,7 @@ class ComponentScanner: Transform() {
   /**
    * 转换Componentization所属jar资源
    */
-  private fun transformComponentizationJar(classPool: ClassPool, jarInput: JarInput) {
+  private fun transformComponentizationJar(classPool: ClassPool, jarInput: JarInput): CtClass {
     println("transformComponentizationJar: ${jarInput.file.absolutePath}")
     val Componentization = classPool.get(COMPONENTIZATION)
     val registerBody = StringBuilder("{\n")
@@ -225,7 +226,7 @@ class ComponentScanner: Transform() {
     registerBody.append("}")
     (Componentization.classInitializer?: Componentization.makeClassInitializer())
         .setBody(registerBody.toString())
-    repackageJar(classPool, jarInput, listOf(Componentization))
+    return Componentization
   }
 
   /**
@@ -233,9 +234,9 @@ class ComponentScanner: Transform() {
    * @param jarInput  输入的jar包
    * @param transformClassed jar包中被转换过的class
    */
-  private fun repackageJar(classPool: ClassPool, jarInput: JarInput,
+  private fun repackageJar(classPool: ClassPool,
+                           jarInput: JarInput, jarOutput: File,
                            transformClassed: List<CtClass>) {
-    val jarOutput = getOutput(jarInput)
     println("repackageJar: ${jarInput.file.absolutePath} -> ${jarOutput.absolutePath}")
     JarFile(jarInput.file).use {jarFile ->
       JarOutputStream(jarOutput.outputStream()).use {jarOs ->
