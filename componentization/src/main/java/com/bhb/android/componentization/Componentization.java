@@ -13,6 +13,8 @@ import java.util.Map;
  */
 public class Componentization {
 
+  private static final String TAG = "Componentization";
+
   /**
    * 收集到的组件注册信息
    */
@@ -33,15 +35,31 @@ public class Componentization {
       sComponents = new HashMap<>();
     }
     try {
-      Log.e("Componentization", "register: " + register);
+      Log.e(TAG, "register: " + register);
       ComponentRegister.Item registerItem = register.newInstance().register();
       for (Class<? extends API> api : registerItem.apis) {
         sComponentProvider.put(api, registerItem.service);
       }
     } catch (Exception e) {
       e.printStackTrace();
-      Log.e("Componentization", Log.getStackTraceString(e));
+      Log.e(TAG, Log.getStackTraceString(e));
     }
+  }
+
+  /**
+   * 尝试获取指定api实现
+   * @param type api接口
+   * @param <T>  类型
+   * @return     api实现：必须被AService注解修饰
+   */
+  public static <T extends API> T getSafely(Class<T> type) {
+    try {
+      return get(type);
+    } catch (ComponentException e) {
+      e.printStackTrace();
+      Log.e(TAG, Log.getStackTraceString(e));
+    }
+    return null;
   }
 
   /**

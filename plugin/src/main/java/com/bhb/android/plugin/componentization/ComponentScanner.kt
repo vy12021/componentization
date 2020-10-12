@@ -6,7 +6,6 @@ import javassist.CtClass
 import javassist.CtField
 import java.io.File
 import java.io.IOException
-import java.util.*
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
@@ -53,8 +52,9 @@ class ComponentScanner: Transform() {
     }
     val classPool = ClassPool(true)
     var componentizationJarInput: JarInput? = null
-    transformInvocation.inputs.forEach { input ->
-      input.jarInputs.forEach { jarInput ->
+    val inputs = mutableListOf<QualifiedContent>()
+    transformInvocation.inputs.forEach input@{ input ->
+      input.jarInputs.forEach jarInput@{ jarInput ->
         if (jarInput.status == Status.REMOVED) {
           return
         }
@@ -62,27 +62,49 @@ class ComponentScanner: Transform() {
         if (null == componentizationJarInput && null != classPool.getOrNull(COMPONENTIZATION)) {
           componentizationJarInput = jarInput
           println("查找到组件管理类: $COMPONENTIZATION")
-        } else {
-          if (jarInput.name.endsWith("classes.jar")) {
-            if (transformComponentsFromJar(classPool, jarInput).isNotEmpty()) {
-              return
-            }
-          }
-          jarInput.file.copyRecursively(getOutput(jarInput))
+          return@jarInput
         }
+        inputs.add(jarInput)
       }
-      input.directoryInputs.forEach { dirInput ->
+      input.directoryInputs.forEach dirInput@{ dirInput ->
         classPool.appendClassPath(dirInput.file.absolutePath)
-        transformComponentsFromDir(classPool, dirInput)
-        dirInput.file.copyRecursively(getOutput(dirInput))
+        inputs.add(dirInput)
       }
     }
     if (null == componentizationJarInput) {
       throw RuntimeException("没有查找到组件工具：$COMPONENTIZATION")
     }
+    try {
+      inputs.forEach input@{input ->
+        println("找到资源：${input.file.absolutePath}")
+        if (input is JarInput) {
+          if (input.file.name == "classes.jar") {
+            val transformClasses = transformComponentsFromJar(classPool, input)
+            if (transformClasses.isNotEmpty()) {
+              repackageJar(classPool, input, transformClasses)
+              return@input
+            }
+          }
+          input.file.copyTo(getOutput(input))
+        } else if (input is DirectoryInput) {
+          val dirOutput = getOutput(input)
+          // 目录先copy，然后覆盖被修改的类
+          input.file.copyRecursively(dirOutput)
+          // 兼容java的classes目录和kotlin的kotlin-classes目录
+          if (input.file.name == "classes" || input.file.parentFile.name == "kotlin-classes") {
+            println("transformComponentsFromDir: ${input.file.absolutePath} -> ${dirOutput.absolutePath}")
+            transformComponentsFromDir(classPool, input).forEach {clazz ->
+              clazz.writeFile(dirOutput.absolutePath)
+              println("\twrite class: ${clazz.name}")
+            }
+          }
+        }
+      }
+    } catch (e: Exception) {
+      throw e
+    }
     // checkRegisterValid(classPool)
-    transformComponentizationJar(classPool, JarFile(componentizationJarInput!!.file),
-            getOutput(componentizationJarInput!!))
+    transformComponentizationJar(classPool, componentizationJarInput!!)
     println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
     classPool.clearImportedPackages()
   }
@@ -96,8 +118,9 @@ class ComponentScanner: Transform() {
    * @return 返回被修改过的类
    */
   @Throws(IOException::class, ClassNotFoundException::class)
-  private fun transformComponentsFromJar(classPool: ClassPool, jarInput: JarInput): List<CtClass> {
-    println("collectComponentsFromJar: ${jarInput.name} =================>")
+  private fun transformComponentsFromJar(classPool: ClassPool,
+                                         jarInput: JarInput): List<CtClass> {
+    println("collectComponentsFromJar: ${jarInput.file.absolutePath}")
     val transformedClasses = mutableListOf<CtClass>()
     JarFile(jarInput.file).use {
       it.entries().toList().forEach { entry ->
@@ -105,7 +128,7 @@ class ComponentScanner: Transform() {
         if (!classEntryName.endsWith(".class")) {
           return@forEach
         }
-        println("class file: $classEntryName")
+        println("\tclass file: $classEntryName")
         collectComponentRegister(classPool, classEntryName)
         transformComponentInject(classPool, classEntryName)?.let { transformedClass ->
           transformedClasses.add(transformedClass)
@@ -120,8 +143,9 @@ class ComponentScanner: Transform() {
    * @return 返回被修改过的类
    */
   @Throws(IOException::class, ClassNotFoundException::class)
-  private fun transformComponentsFromDir(classPool: ClassPool, dirInput: DirectoryInput): List<CtClass> {
-    println("collectComponentsFromDir: ${dirInput.file.absolutePath} =================>")
+  private fun transformComponentsFromDir(classPool: ClassPool,
+                                         dirInput: DirectoryInput): List<CtClass> {
+    println("collectComponentsFromDir: ${dirInput.file.absolutePath}")
     val transformedClasses = mutableListOf<CtClass>()
     getAllFiles(dirInput.file).forEach { classFile ->
       val classEntryName: String = classFile.absolutePath
@@ -130,10 +154,9 @@ class ComponentScanner: Transform() {
       if (!classEntryName.endsWith(".class")) {
         return@forEach
       }
-      println("class file: $classEntryName")
+      println("\tclass file: $classEntryName")
       collectComponentRegister(classPool, classEntryName)
       transformComponentInject(classPool, classEntryName)?.let { transformedClass ->
-        transformedClass.writeFile(getOutput(dirInput).absolutePath)
         transformedClasses.add(transformedClass)
       }
     }
@@ -143,9 +166,13 @@ class ComponentScanner: Transform() {
   /**
    * 从类资源路径转换为CtClass
    */
-  private fun getCtClassFromClassEntry(classPool: ClassPool, classEntryName: String): CtClass
-      = classPool.get(classEntryName.substring(0,
-      classEntryName.indexOf(".class")).replace("/", "."))
+  private fun getCtClassFromClassEntry(classPool: ClassPool, classEntryName: String): CtClass {
+    val index = classEntryName.indexOf(".class")
+    if (index >= 0) {
+      return classPool.get(classEntryName.substring(0, index).replace("/", "."))
+    }
+    return classPool.get("java.lang.Object")
+  }
 
   /**
    * 收集组件注册器
@@ -155,7 +182,7 @@ class ComponentScanner: Transform() {
     if (ctClass.packageName != PACKAGE) {
       return
     }
-    if (ctClass.simpleName.endsWith("_Register")) {
+    if (!ctClass.simpleName.endsWith("_Register")) {
       return
     }
     registers.add(ctClass)
@@ -167,14 +194,14 @@ class ComponentScanner: Transform() {
    */
   private fun transformComponentInject(classPool: ClassPool, classEntryName: String): CtClass? {
     val Componentization = classPool.get(COMPONENTIZATION)
+    val AutoWired = classPool.get(ANNOTATION_AUTOWIRED)
     val ctClass = getCtClassFromClassEntry(classPool, classEntryName)
     var hasChanged = false
-    ctClass.declaredFields.filter { it.hasAnnotation(ANNOTATION_AUTOWIRED) }.forEach {field ->
+    ctClass.declaredFields.filter { it.hasAnnotation(AutoWired.name) }.forEach {field ->
+      println("\ttransformComponentInject: ${ctClass.name} --> ${field.name}")
       ctClass.removeField(field)
       ctClass.addField(field,
-          CtField.Initializer.byCallWithParams(Componentization, "get", arrayOf(
-              field.declaringClass.name
-          ))
+          CtField.Initializer.byExpr("${Componentization.name}.getSafely(${field.type.name}.class)")
       )
       if (ctClass.isKotlin) {
         // todo 延迟初始化实现
@@ -187,25 +214,39 @@ class ComponentScanner: Transform() {
   /**
    * 转换Componentization所属jar资源
    */
-  private fun transformComponentizationJar(classPool: ClassPool,
-                                           jarInput: JarFile, jarOutput: File) {
+  private fun transformComponentizationJar(classPool: ClassPool, jarInput: JarInput) {
+    println("transformComponentizationJar: ${jarInput.file.absolutePath}")
     val Componentization = classPool.get(COMPONENTIZATION)
     val registerBody = StringBuilder("{\n")
     registers.forEach {
       registerBody.append("register(${it.name}.class);\n")
-      println("insert ComponentRegister: ${it.name}.class")
+      println("\tinsert ComponentRegister: ${it.name}.class")
     }
     registerBody.append("}")
     (Componentization.classInitializer?: Componentization.makeClassInitializer())
         .setBody(registerBody.toString())
-    jarInput.use {
+    repackageJar(classPool, jarInput, listOf(Componentization))
+  }
+
+  /**
+   * 重新打jar
+   * @param jarInput  输入的jar包
+   * @param transformClassed jar包中被转换过的class
+   */
+  private fun repackageJar(classPool: ClassPool, jarInput: JarInput,
+                           transformClassed: List<CtClass>) {
+    val jarOutput = getOutput(jarInput)
+    println("repackageJar: ${jarInput.file.absolutePath} -> ${jarOutput.absolutePath}")
+    JarFile(jarInput.file).use {jarFile ->
       JarOutputStream(jarOutput.outputStream()).use {jarOs ->
-        jarInput.entries().toList().forEach {entry ->
-          jarInput.getInputStream(entry).use {entryIs ->
+        jarFile.entries().toList().forEach {entry ->
+          jarFile.getInputStream(entry).use {entryIs ->
             val zipEntry = ZipEntry(entry.name)
-            if (entry.name.replace("/", ".").startsWith(Componentization.name)) {
+            val clazz = getCtClassFromClassEntry(classPool, entry.name)
+            if (transformClassed.contains(clazz)) {
+              println("\twrite class: ${clazz.name}")
               jarOs.putNextEntry(zipEntry)
-              jarOs.write(Componentization.toBytecode())
+              jarOs.write(clazz.toBytecode())
             } else {
               jarOs.putNextEntry(zipEntry)
               jarOs.write(entryIs.readBytes())
@@ -246,7 +287,7 @@ class ComponentScanner: Transform() {
     if (null == files || files.isEmpty()) {
       return emptyList()
     }
-    val results: MutableList<File> = ArrayList()
+    val results = mutableListOf<File>()
     for (child in files) {
       if (child.isFile) {
         results.add(child)

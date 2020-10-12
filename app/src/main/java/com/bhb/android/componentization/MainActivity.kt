@@ -14,11 +14,9 @@ class MainActivity: AppCompatActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    funAAPI = Componentization.get(AppAPI::class.java)
-    contextAPI = Componentization.get(ContextAPI::class.java)
     setContentView(R.layout.main_activity)
     findViewById<View>(android.R.id.content).setOnClickListener {
-      contextAPI.toast("It's ContextAPI")
+      contextAPI.toast("I'm ContextAPI")
     }
   }
 
