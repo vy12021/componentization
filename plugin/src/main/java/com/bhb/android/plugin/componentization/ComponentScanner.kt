@@ -1,6 +1,7 @@
 package com.bhb.android.plugin.componentization
 
 import com.android.build.api.transform.*
+import javassist.ClassPath
 import javassist.ClassPool
 import javassist.CtClass
 import javassist.CtField
@@ -50,15 +51,17 @@ class ComponentScanner: Transform() {
     outputProvider = transformInvocation.outputProvider.apply {
       deleteAll()
     }
-    val classPool = ClassPool(true)
+    val classPool = ClassPool(false)
     var componentizationJarInput: JarInput? = null
     val inputs = mutableListOf<QualifiedContent>()
+    val classPaths = mutableListOf<ClassPath>()
+    classPaths.add(classPool.appendSystemPath())
     transformInvocation.inputs.forEach input@{ input ->
       input.jarInputs.forEach jarInput@{ jarInput ->
         if (jarInput.status == Status.REMOVED) {
           return@jarInput
         }
-        classPool.appendClassPath(jarInput.file.absolutePath)
+        classPaths.add(classPool.appendClassPath(jarInput.file.absolutePath))
         if (null == componentizationJarInput && null != classPool.getOrNull(COMPONENTIZATION)) {
           componentizationJarInput = jarInput
           println("查找到组件管理类: $COMPONENTIZATION")
@@ -67,7 +70,7 @@ class ComponentScanner: Transform() {
         inputs.add(jarInput)
       }
       input.directoryInputs.forEach dirInput@{ dirInput ->
-        classPool.appendClassPath(dirInput.file.absolutePath)
+        classPaths.add(classPool.appendClassPath(dirInput.file.absolutePath))
         inputs.add(dirInput)
       }
     }
@@ -80,7 +83,7 @@ class ComponentScanner: Transform() {
         val jarOutput = getOutput(input)
         if (input.file.name == "classes.jar") {
           transformComponentsFromJar(classPool, input).apply {
-            if (false && isNotEmpty()) {
+            if (isNotEmpty()) {
               repackageJar(classPool, input,  jarOutput, this)
               return@input
             }
@@ -103,11 +106,14 @@ class ComponentScanner: Transform() {
     }
     // checkRegisterValid(classPool)
     componentizationJarInput!!.apply {
-      /*repackageJar(classPool, this, getOutput(this),
-              listOf(transformComponentizationJar(classPool, this)))*/
+      repackageJar(classPool, this, getOutput(this),
+              listOf(transformComponentizationJar(classPool, this)))
     }
-    println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
+    classPaths.forEach { classpath ->
+      classPool.removeClassPath(classpath)
+    }
     classPool.clearImportedPackages()
+    println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
   }
 
   private fun getOutput(content: QualifiedContent)
@@ -209,6 +215,7 @@ class ComponentScanner: Transform() {
       }
       hasChanged = true
     }
+    ctClass.freeze()
     return if (hasChanged) ctClass else null
   }
 
@@ -226,6 +233,7 @@ class ComponentScanner: Transform() {
     registerBody.append("}")
     (Componentization.classInitializer?: Componentization.makeClassInitializer())
         .setBody(registerBody.toString())
+    Componentization.freeze()
     return Componentization
   }
 
