@@ -1,10 +1,12 @@
 package com.bhb.android.plugin.componentization
 
 import com.android.build.api.transform.*
-import javassist.*
+import javassist.ClassPath
+import javassist.ClassPool
+import javassist.CtClass
+import javassist.CtField
 import java.io.File
 import java.io.IOException
-import java.lang.Exception
 import java.util.*
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -22,6 +24,11 @@ class ComponentScanner: Transform() {
     private const val ANNOTATION_API = "${PACKAGE}.Api"
     private const val ANNOTATION_SERVICE = "${PACKAGE}.Service"
     private const val ANNOTATION_AUTOWIRED = "${PACKAGE}.AutoWired"
+    init {
+      ClassPool.cacheOpenedJarFile = false
+      ClassPool.doPruning = false
+      ClassPool.releaseUnmodifiedClassFile = true
+    }
   }
 
   private val registers = mutableSetOf<CtClass>()
@@ -62,33 +69,16 @@ class ComponentScanner: Transform() {
             collectInputs(classPool, inputs, classPaths)
             ?: throw RuntimeException("没有查找到组件工具：$COMPONENTIZATION")
     // 收集注册信息，并转换相关类
-    val transformedClasses = transformClasses(classPool, inputs)
+    transformClasses(classPool, inputs)
     // 验证注册信息正确性
     // checkRegisterValid(classPool)
     // 注入自动化注册逻辑，并重新打包
     componentizationJarInput.apply {
       repackageJar(classPool, this, getOutput(this),
-              listOf(transformComponentizationJar(classPool, this)).apply {
-                transformedClasses.addAll(this)
-              })
+              listOf(transformComponentizationJar(classPool, this)))
     }
-    // 释放classpath资源，关闭打开的io，清理导入缓存
-    var exception: Exception?
-    getAllClasses(classPool).forEach { clazz ->
-      exception = null
-      try {
-        clazz.detach()
-      } catch (ignored: Exception) {
-        exception = ignored
-      } finally {
-        println("detachClass: ${clazz.name} throws ${exception?.message ?: "null"}")
-      }
-    }
-    classPaths.forEach { classpath ->
-      println("removeClassPath: $classpath")
-      classPool.removeClassPath(classpath)
-    }
-    classPool.clearImportedPackages()
+    // 释放类资源
+    freeClassPoll(classPool, classPaths)
     println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
   }
 
@@ -330,6 +320,30 @@ class ComponentScanner: Transform() {
         }
       }
     }
+  }
+
+  private fun freeClassPoll(classPool: ClassPool, classPaths: List<ClassPath>) {
+    // 释放classpath资源，关闭打开的io，清理导入缓存
+    var exception: Exception?
+    getAllClasses(classPool).forEach { clazz ->
+      exception = null
+      try {
+        clazz.detach()
+      } catch (ignored: Exception) {
+        exception = ignored
+      } finally {
+        println("detachClass: ${clazz.name} throws ${exception?.message ?: "null"}")
+      }
+    }
+    /*val ClassPoolTail = ClassPool::class.java.getDeclaredField("source")
+        .apply { isAccessible = true }.get(classPool)
+    val ClassPathList = ClassPoolTail.javaClass.getDeclaredField("pathList")
+        .apply { isAccessible = true }.get(ClassPoolTail)*/
+    classPaths.forEach { classpath ->
+      println("removeClassPath: $classpath")
+      classPool.removeClassPath(classpath)
+    }
+    classPool.clearImportedPackages()
   }
 
   /**
