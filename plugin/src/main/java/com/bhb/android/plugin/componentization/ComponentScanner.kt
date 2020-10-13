@@ -1,12 +1,11 @@
 package com.bhb.android.plugin.componentization
 
 import com.android.build.api.transform.*
-import javassist.ClassPath
-import javassist.ClassPool
-import javassist.CtClass
-import javassist.CtField
+import javassist.*
 import java.io.File
 import java.io.IOException
+import java.lang.Exception
+import java.util.*
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
@@ -28,6 +27,7 @@ class ComponentScanner: Transform() {
   private val registers = mutableSetOf<CtClass>()
 
   private lateinit var outputProvider: TransformOutputProvider
+  private lateinit var allInputs: Collection<TransformInput>
 
   override fun getName() = "ComponentScanner"
 
@@ -48,15 +48,62 @@ class ComponentScanner: Transform() {
   override fun transform(transformInvocation: TransformInvocation) {
     val startTime = System.currentTimeMillis()
     super.transform(transformInvocation)
+    allInputs = transformInvocation.inputs
     outputProvider = transformInvocation.outputProvider.apply {
+      // 清理所有缓存文件
       deleteAll()
     }
     val classPool = ClassPool(false)
-    var componentizationJarInput: JarInput? = null
-    val inputs = mutableListOf<QualifiedContent>()
     val classPaths = mutableListOf<ClassPath>()
     classPaths.add(classPool.appendSystemPath())
-    transformInvocation.inputs.forEach input@{ input ->
+    val inputs = mutableListOf<QualifiedContent>()
+    // 收集必要的输入建立完成的classpath环境
+    val componentizationJarInput =
+            collectInputs(classPool, inputs, classPaths)
+            ?: throw RuntimeException("没有查找到组件工具：$COMPONENTIZATION")
+    // 收集注册信息，并转换相关类
+    val transformedClasses = transformClasses(classPool, inputs)
+    // 验证注册信息正确性
+    // checkRegisterValid(classPool)
+    // 注入自动化注册逻辑，并重新打包
+    componentizationJarInput.apply {
+      repackageJar(classPool, this, getOutput(this),
+              listOf(transformComponentizationJar(classPool, this)).apply {
+                transformedClasses.addAll(this)
+              })
+    }
+    // 释放classpath资源，关闭打开的io，清理导入缓存
+    var exception: Exception?
+    getAllClasses(classPool).forEach { clazz ->
+      exception = null
+      try {
+        clazz.detach()
+      } catch (ignored: Exception) {
+        exception = ignored
+      } finally {
+        println("detachClass: ${clazz.name} throws ${exception?.message ?: "null"}")
+      }
+    }
+    classPaths.forEach { classpath ->
+      println("removeClassPath: $classpath")
+      classPool.removeClassPath(classpath)
+    }
+    classPool.clearImportedPackages()
+    println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
+  }
+
+  private fun getOutput(content: QualifiedContent)
+  = outputProvider.getContentLocation(content.name, content.contentTypes, content.scopes,
+          if (content is JarInput) Format.JAR else Format.DIRECTORY)
+
+  /**
+   * 收集输入的一些上下文信息
+   */
+  private fun collectInputs(classPool: ClassPool,
+                            inputs: MutableList<QualifiedContent>,
+                            classPaths: MutableList<ClassPath>): JarInput? {
+    var componentizationJarInput: JarInput? = null
+    allInputs.forEach input@{ input ->
       input.jarInputs.forEach jarInput@{ jarInput ->
         if (jarInput.status == Status.REMOVED) {
           return@jarInput
@@ -74,15 +121,23 @@ class ComponentScanner: Transform() {
         inputs.add(dirInput)
       }
     }
-    if (null == componentizationJarInput) {
-      throw RuntimeException("没有查找到组件工具：$COMPONENTIZATION")
-    }
+    return componentizationJarInput
+  }
+
+  /**
+   * 转换处理所有输入的classpath文件
+   * @return 被修改和加载过的class记录，用于最后手动资源释放
+   */
+  private fun transformClasses(classPool: ClassPool, inputs: List<QualifiedContent>)
+          : MutableList<CtClass> {
+    val classes = mutableListOf<CtClass>()
     inputs.forEach input@{input ->
       println("找到资源：${input.file.absolutePath}")
       if (input is JarInput) {
         val jarOutput = getOutput(input)
         if (input.file.name == "classes.jar") {
           transformComponentsFromJar(classPool, input).apply {
+            classes.addAll(this)
             if (isNotEmpty()) {
               repackageJar(classPool, input,  jarOutput, this)
               return@input
@@ -95,30 +150,20 @@ class ComponentScanner: Transform() {
         // 目录先copy，然后覆盖被修改的类
         input.file.copyRecursively(dirOutput)
         // 兼容java的classes目录和kotlin的kotlin-classes目录
-        if (input.file.name == "classes" || input.file.parentFile.name == "kotlin-classes") {
+        if ((input.file.name == "classes" || input.file.parentFile.name == "kotlin-classes")) {
           println("transformComponentsFromDir: ${input.file.absolutePath} -> ${dirOutput.absolutePath}")
-          transformComponentsFromDir(classPool, input).forEach { clazz ->
-            clazz.writeFile(dirOutput.absolutePath)
-            println("\twrite class: ${clazz.name}")
+          transformComponentsFromDir(classPool, input).apply {
+            classes.addAll(this)
+            forEach { clazz ->
+              clazz.writeFile(dirOutput.absolutePath)
+              println("\twrite class: ${clazz.name}")
+            }
           }
         }
       }
     }
-    // checkRegisterValid(classPool)
-    componentizationJarInput!!.apply {
-      repackageJar(classPool, this, getOutput(this),
-              listOf(transformComponentizationJar(classPool, this)))
-    }
-    classPaths.forEach { classpath ->
-      classPool.removeClassPath(classpath)
-    }
-    classPool.clearImportedPackages()
-    println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
+    return classes
   }
-
-  private fun getOutput(content: QualifiedContent)
-  = outputProvider.getContentLocation(content.name, content.contentTypes, content.scopes,
-          if (content is JarInput) Format.JAR else Format.DIRECTORY)
 
   /**
    * 从jar文件中处理，由依赖模块触发
@@ -200,10 +245,10 @@ class ComponentScanner: Transform() {
    * @return 返回被修改过的类
    */
   private fun transformComponentInject(classPool: ClassPool, classEntryName: String): CtClass? {
+    var hasChanged = false
+    val ctClass = getCtClassFromClassEntry(classPool, classEntryName)
     val Componentization = classPool.get(COMPONENTIZATION)
     val AutoWired = classPool.get(ANNOTATION_AUTOWIRED)
-    val ctClass = getCtClassFromClassEntry(classPool, classEntryName)
-    var hasChanged = false
     ctClass.declaredFields.filter { it.hasAnnotation(AutoWired.name) }.forEach {field ->
       println("\ttransformComponentInject: ${ctClass.name} --> ${field.name}")
       ctClass.removeField(field)
@@ -233,7 +278,6 @@ class ComponentScanner: Transform() {
     registerBody.append("}")
     (Componentization.classInitializer?: Componentization.makeClassInitializer())
         .setBody(registerBody.toString())
-    Componentization.freeze()
     return Componentization
   }
 
@@ -305,6 +349,26 @@ class ComponentScanner: Transform() {
       }
     }
     return results
+  }
+
+  /**
+   * 获取所有被载入的class
+   */
+  private fun getAllClasses(classPool: ClassPool): List<CtClass> {
+    val clazzes = mutableListOf<CtClass>()
+    val classes = ClassPool::class.java.getDeclaredField("classes")
+            .apply { isAccessible = true }.get(classPool) as Hashtable<*, *>
+    val parent = ClassPool::class.java.getDeclaredField("parent")
+            .apply { isAccessible = true }.get(classPool) as ClassPool?
+    classes.forEach {
+      val name = (it.key as String)
+      val clazz = (it.value as CtClass)
+      clazzes.add(clazz)
+    }
+    if (null != parent) {
+      clazzes.addAll(getAllClasses(parent))
+    }
+    return clazzes
   }
 
 }
