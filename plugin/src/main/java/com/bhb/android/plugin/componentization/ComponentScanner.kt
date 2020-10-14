@@ -15,7 +15,7 @@ import java.util.zip.ZipEntry
 /**
  * Android插件提供的资源转换器
  */
-class ComponentScanner: Transform() {
+class ComponentScanner(val DEBUG: Boolean): Transform() {
 
   companion object {
     private const val PACKAGE = "com.bhb.android.componentization"
@@ -101,7 +101,7 @@ class ComponentScanner: Transform() {
         classPaths.add(classPool.appendClassPath(jarInput.file.absolutePath))
         if (null == componentizationJarInput && null != classPool.getOrNull(COMPONENTIZATION)) {
           componentizationJarInput = jarInput
-          println("查找到组件管理类: $COMPONENTIZATION")
+          println("查找到组件管理类: $COMPONENTIZATION 在${jarInput.file.absolutePath}中")
           return@jarInput
         }
         inputs.add(jarInput)
@@ -122,7 +122,7 @@ class ComponentScanner: Transform() {
           : MutableList<CtClass> {
     val classes = mutableListOf<CtClass>()
     inputs.forEach input@{input ->
-      println("找到资源：${input.file.absolutePath}")
+      if (DEBUG) println("找到资源：${input.file.absolutePath}")
       if (input is JarInput) {
         val jarOutput = getOutput(input)
         if (input.file.name == "classes.jar") {
@@ -141,12 +141,11 @@ class ComponentScanner: Transform() {
         input.file.copyRecursively(dirOutput)
         // 兼容java的classes目录和kotlin的kotlin-classes目录
         if ((input.file.name == "classes" || input.file.parentFile.name == "kotlin-classes")) {
-          println("transformComponentsFromDir: ${input.file.absolutePath} -> ${dirOutput.absolutePath}")
           transformComponentsFromDir(classPool, input).apply {
             classes.addAll(this)
             forEach { clazz ->
               clazz.writeFile(dirOutput.absolutePath)
-              println("\twrite class: ${clazz.name}")
+              println("\twrite class: ${clazz.name} -> ${dirOutput.absolutePath}")
             }
           }
         }
@@ -170,7 +169,7 @@ class ComponentScanner: Transform() {
         if (!classEntryName.endsWith(".class")) {
           return@forEach
         }
-        println("\tclass file: $classEntryName")
+        if (DEBUG) println("\tclass file: $classEntryName")
         collectComponentRegister(classPool, classEntryName)
         transformComponentInject(classPool, classEntryName)?.let { transformedClass ->
           transformedClasses.add(transformedClass)
@@ -187,7 +186,7 @@ class ComponentScanner: Transform() {
   @Throws(IOException::class, ClassNotFoundException::class)
   private fun transformComponentsFromDir(classPool: ClassPool,
                                          dirInput: DirectoryInput): List<CtClass> {
-    println("collectComponentsFromDir: ${dirInput.file.absolutePath}")
+    println("transformComponentsFromDir: ${dirInput.file.absolutePath}")
     val transformedClasses = mutableListOf<CtClass>()
     getAllFiles(dirInput.file).forEach { classFile ->
       val classEntryName: String = classFile.absolutePath
@@ -196,7 +195,7 @@ class ComponentScanner: Transform() {
       if (!classEntryName.endsWith(".class")) {
         return@forEach
       }
-      println("\tclass file: $classEntryName")
+      if (DEBUG) println("\tclass file: $classEntryName")
       collectComponentRegister(classPool, classEntryName)
       transformComponentInject(classPool, classEntryName)?.let { transformedClass ->
         transformedClasses.add(transformedClass)
@@ -240,7 +239,7 @@ class ComponentScanner: Transform() {
     val Componentization = classPool.get(COMPONENTIZATION)
     val AutoWired = classPool.get(ANNOTATION_AUTOWIRED)
     ctClass.declaredFields.filter { it.hasAnnotation(AutoWired.name) }.forEach {field ->
-      println("\ttransformComponentInject: ${ctClass.name} --> ${field.name}")
+      if (DEBUG) println("\ttransformComponentInject: ${ctClass.name} -> ${field.name}")
       ctClass.removeField(field)
       ctClass.addField(field,
           CtField.Initializer.byExpr("${Componentization.name}.getSafely(${field.type.name}.class)")
@@ -279,7 +278,7 @@ class ComponentScanner: Transform() {
   private fun repackageJar(classPool: ClassPool,
                            jarInput: JarInput, jarOutput: File,
                            transformClassed: List<CtClass>) {
-    println("repackageJar: ${jarInput.file.absolutePath} -> ${jarOutput.absolutePath}")
+    println("repackageJar: \n${jarInput.file.absolutePath} \n--> ${jarOutput.absolutePath}")
     JarFile(jarInput.file).use {jarFile ->
       JarOutputStream(jarOutput.outputStream()).use {jarOs ->
         jarFile.entries().toList().forEach {entry ->
@@ -287,7 +286,7 @@ class ComponentScanner: Transform() {
             val zipEntry = ZipEntry(entry.name)
             val clazz = getCtClassFromClassEntry(classPool, entry.name)
             if (transformClassed.contains(clazz)) {
-              println("\twrite class: ${clazz.name}")
+              println("\twrite class: ${clazz.name} -> ${jarOutput.absolutePath}")
               jarOs.putNextEntry(zipEntry)
               jarOs.write(clazz.toBytecode())
             } else {
@@ -332,7 +331,7 @@ class ComponentScanner: Transform() {
       } catch (ignored: Exception) {
         exception = ignored
       } finally {
-        println("detachClass: ${clazz.name} throws ${exception?.message ?: "null"}")
+        if (DEBUG) println("detachClass: ${clazz.name} throws ${exception?.message ?: "null"}")
       }
     }
     /*val ClassPoolTail = ClassPool::class.java.getDeclaredField("source")
@@ -340,7 +339,7 @@ class ComponentScanner: Transform() {
     val ClassPathList = ClassPoolTail.javaClass.getDeclaredField("pathList")
         .apply { isAccessible = true }.get(ClassPoolTail)*/
     classPaths.forEach { classpath ->
-      println("removeClassPath: $classpath")
+      if (DEBUG) println("removeClassPath: $classpath")
       classPool.removeClassPath(classpath)
     }
     classPool.clearImportedPackages()

@@ -11,7 +11,7 @@ import java.util.Map;
  * 组件入口调用
  * Created by Tesla on 2020/09/22.
  */
-public class Componentization {
+public final class Componentization {
 
   private static final String TAG = "Componentization";
 
