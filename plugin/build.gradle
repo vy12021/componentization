@@ -5,8 +5,7 @@ sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
 dependencies {
-  compileOnly gradleApi()
-  compileOnly 'com.android.tools.build:gradle:4.0.2'
+  compileOnly 'com.android.tools.build:gradle:4.1.0'
   implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.4.10'
   implementation 'org.javassist:javassist:3.27.0-GA'
 }

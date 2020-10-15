@@ -159,7 +159,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       }
     }
     if (apisType.isEmpty()) {
-      throw new RuntimeException(serviceType.toString() + "的父接口中必须至少有一个被CApi注解修饰");
+      throw new RuntimeException(serviceType.toString() + "的父接口中必须至少有一个被Api注解修饰");
     }
     CodeBlock.Builder coder = CodeBlock.builder();
     coder.addStatement("final $T<Class<? extends $T>> apis = new $T<>($L)",

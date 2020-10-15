@@ -18,7 +18,7 @@ class ComponentizationPlugin: Plugin<Project> {
     } catch (e: Exception) {}
     android?.apply {
       println("注册扫描器 ComponentRegisterScanner")
-      registerTransform(ComponentScanner(config?.debugMode == true))
+      registerTransform(ComponentScanner(this, config ?: ComponentizationConfig()))
     }
   }
 

@@ -1,6 +1,7 @@
 package com.bhb.android.plugin.componentization
 
 import com.android.build.api.transform.*
+import com.android.build.gradle.AppExtension
 import javassist.ClassPath
 import javassist.ClassPool
 import javassist.CtClass
@@ -15,7 +16,7 @@ import java.util.zip.ZipEntry
 /**
  * Android插件提供的资源转换器
  */
-class ComponentScanner(val DEBUG: Boolean): Transform() {
+class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig): Transform() {
 
   companion object {
     private const val PACKAGE = "com.bhb.android.componentization"
@@ -30,6 +31,18 @@ class ComponentScanner(val DEBUG: Boolean): Transform() {
       ClassPool.releaseUnmodifiedClassFile = true
     }
   }
+
+  /**
+   * android sdk所在路径
+   */
+  private val androidJar by lazy {
+    androidExt.sdkDirectory.absolutePath + "/platforms/${androidExt.compileSdkVersion}/android.jar"
+  }
+
+  /**
+   * 是否调试模式
+   */
+  private val DEBUG = config.debugMode
 
   private val registers = mutableSetOf<CtClass>()
 
@@ -63,6 +76,7 @@ class ComponentScanner(val DEBUG: Boolean): Transform() {
     val classPool = ClassPool(false)
     val classPaths = mutableListOf<ClassPath>()
     classPaths.add(classPool.appendSystemPath())
+    classPaths.add(classPool.appendClassPath(androidJar))
     val inputs = mutableListOf<QualifiedContent>()
     // 收集必要的输入建立完成的classpath环境
     val componentizationJarInput =
