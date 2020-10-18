@@ -8,6 +8,7 @@ import javassist.CtClass
 import javassist.CtField
 import java.io.File
 import java.io.IOException
+import java.lang.IllegalArgumentException
 import java.util.*
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -85,7 +86,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
     // 收集注册信息，并转换相关类
     transformClasses(classPool, inputs)
     // 验证注册信息正确性
-    // checkRegisterValid(classPool)
+    checkRegisterValid(classPool)
     // 注入自动化注册逻辑，并重新打包
     componentizationJarInput.apply {
       repackageJar(classPool, this, getOutput(this),
@@ -318,18 +319,13 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
    * 检查注册器和组件的正确性，例如：一个api接口不能同时有两个service实现
    */
   private fun checkRegisterValid(classPool: ClassPool) {
-    val RegisterItem = classPool.get(REGISTER_ITEM).toClass()
-    val api2ServiceMap = mutableMapOf<String, String>()
-    registers.forEach {registerCls ->
-      registerCls.toClass().run {
-        getDeclaredMethod("register").invoke(newInstance()).run {
-          val serviceCls = RegisterItem.getDeclaredField("apis").get(this) as Class<Any>
-          (RegisterItem.getDeclaredField("apis").get(this) as List<Class<Any>>).forEach {apiCls ->
-            api2ServiceMap.put(apiCls.canonicalName, serviceCls.canonicalName)?.let {existService ->
-              throw java.lang.RuntimeException(
-                  "对于${apiCls.simpleName}找到重复实现：${existService}和${serviceCls.simpleName}")
-            }
-          }
+    val registerMetas = mutableMapOf<CtClass, CtClass>()
+    registers.forEach {register ->
+      val pair = (register.getField("meta").constantValue as String).split(";".toRegex())
+      val service = classPool.get(pair[0])
+      pair[1].split(",".toRegex()).map { classPool.get(it) }.forEach {
+        registerMetas.put(it, service)?.apply {
+          throw IllegalArgumentException("${it.name}接口发现重复实现${service.name}和${this.name}")
         }
       }
     }

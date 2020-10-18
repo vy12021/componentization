@@ -5,6 +5,7 @@ import com.google.auto.service.AutoService;
 import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
+import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeName;
@@ -39,6 +40,7 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
 /**
+ * 组件相关注解处理
  * Created by Tesla on 2019/12/20.
  */
 @AutoService(Processor.class)
@@ -105,7 +107,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     Set<Class<? extends Annotation>> annotations = new LinkedHashSet<>();
     annotations.add(Api.class);
     annotations.add(Service.class);
-    annotations.add(AutoWired.class);
+    // annotations.add(AutoWired.class);
     return annotations;
   }
 
@@ -133,14 +135,37 @@ public final class ComponentizationProcessor extends AbstractProcessor {
             .addModifiers(Modifier.PUBLIC)
             .addSuperinterface(ComponentRegister)
             .addMethod(buildRegisterMethod(element))
+            .addField(buildRegisterField(element))
             .build();
   }
 
-  private MethodSpec buildRegisterMethod(Element element) {
-    MethodSpec.Builder builder =  MethodSpec.methodBuilder("register")
-            .addAnnotation(Override.class)
-            .addModifiers(Modifier.PUBLIC)
-            .returns(RegisterItem);
+  private FieldSpec buildRegisterField(Element element) {
+    Type serviceType = ((Symbol.ClassSymbol) element).asType();
+    FieldSpec.Builder builder = FieldSpec.builder(
+            ClassName.get(String.class), "meta",
+            Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC);
+    List<Type> apisType = getApiTypes(element);
+    CodeBlock.Builder coder = CodeBlock.builder();
+    coder.add("\"" + TypeName.get(serviceType).toString() + ";");
+    Type api;
+    for (int i = 0, len = apisType.size(); i < len; i++) {
+      api = apisType.get(i);
+      coder.add(TypeName.get(api).toString());
+      if (i < len - 1) {
+        coder.add(",");
+      }
+    }
+    coder.add("\"");
+    builder.initializer(coder.build());
+    return builder.build();
+  }
+
+  /**
+   * 获取Service中代表的所有实现接口
+   * @param element Service元素
+   * @return 接口列表
+   */
+  private List<Type> getApiTypes(Element element) {
     Type serviceType = ((Symbol.ClassSymbol) element).asType();
     List<Type> interfaces = ((Symbol.ClassSymbol) element).getInterfaces();
     List<Type> apisType = new ArrayList<>(interfaces.size());
@@ -161,6 +186,16 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     if (apisType.isEmpty()) {
       throw new RuntimeException(serviceType.toString() + "的父接口中必须至少有一个被Api注解修饰");
     }
+    return apisType;
+  }
+
+  private MethodSpec buildRegisterMethod(Element element) {
+    MethodSpec.Builder builder =  MethodSpec.methodBuilder("register")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(RegisterItem);
+    Type serviceType = ((Symbol.ClassSymbol) element).asType();
+    List<Type> apisType = getApiTypes(element);
     CodeBlock.Builder coder = CodeBlock.builder();
     coder.addStatement("final $T<Class<? extends $T>> apis = new $T<>($L)",
             ArrayListType, APIType, ArrayListType, apisType.size());
