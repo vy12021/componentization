@@ -10,15 +10,18 @@ import org.gradle.api.Project
 class ComponentizationPlugin: Plugin<Project> {
 
   override fun apply(project: Project) {
-    println("注册插件 ComponentRegisterScanner")
+    println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin<<<<<<<<<<<<<<<<<<<<<<")
     val android = project.extensions.findByType(AppExtension::class.java)
-    var config: ComponentizationConfig? = null
-    try {
-      config = project.extensions.create("componentization", ComponentizationConfig::class.java)
-    } catch (e: Exception) {}
+    val config: ComponentizationConfig = try {
+      project.extensions.create("componentization", ComponentizationConfig::class.java)
+    } catch (e: Exception) {
+      ComponentizationConfig()
+    } finally {
+    }
+    println("获取到插件配置：${config}")
     android?.apply {
-      println("注册扫描器 ComponentRegisterScanner")
-      registerTransform(ComponentScanner(this, config ?: ComponentizationConfig()))
+      println(">>>>>>>>>>>>>>>>>>>>>>>>注册扫描器ComponentScanner<<<<<<<<<<<<<<<<<<<<<<<<<")
+      registerTransform(ComponentScanner(this, config))
     }
   }
 

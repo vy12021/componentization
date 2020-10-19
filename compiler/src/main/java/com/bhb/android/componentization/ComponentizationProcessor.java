@@ -120,7 +120,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       try {
         TypeSpec spec = build(element);
         JavaFile file = JavaFile.builder(PACKAGE, spec)
-                .addFileComment("生成的组件化辅助注册工具").build();
+                .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
         file.writeTo(filer);
       } catch (Exception e) {
         logger.printMessage(Diagnostic.Kind.ERROR, e.getMessage());

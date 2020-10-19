@@ -6,6 +6,7 @@ import javassist.ClassPath
 import javassist.ClassPool
 import javassist.CtClass
 import javassist.CtField
+import javassist.bytecode.AccessFlag
 import java.io.File
 import java.io.IOException
 import java.lang.IllegalArgumentException
@@ -67,6 +68,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
   override fun isIncremental() = true
 
   override fun transform(transformInvocation: TransformInvocation) {
+    println(">>>>>>>>>>>>>>>>>>>>>>启动扫描并注册和注入组件任务<<<<<<<<<<<<<<<<<<<<<<<")
     val startTime = System.currentTimeMillis()
     super.transform(transformInvocation)
     allInputs = transformInvocation.inputs
@@ -94,7 +96,8 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
     }
     // 释放类资源
     freeClassPoll(classPool, classPaths)
-    println("扫描组件耗时：${(System.currentTimeMillis() - startTime) / 1000f}秒")
+    println(">>>>>>>>>>>>>>>>>>扫描并注册和注入组件总共耗时：" +
+            "${(System.currentTimeMillis() - startTime) / 1000f}秒<<<<<<<<<<<<<<<<<")
   }
 
   private fun getOutput(content: QualifiedContent)
@@ -140,6 +143,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
       if (DEBUG) println("找到资源：${input.file.absolutePath}")
       if (input is JarInput) {
         val jarOutput = getOutput(input)
+        // 子模块的类包名称
         if (input.file.name == "classes.jar") {
           transformComponentsFromJar(classPool, input).apply {
             classes.addAll(this)
@@ -255,6 +259,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
     val AutoWired = classPool.get(ANNOTATION_AUTOWIRED)
     ctClass.declaredFields.filter { it.hasAnnotation(AutoWired.name) }.forEach {field ->
       if (DEBUG) println("\ttransformComponentInject: ${ctClass.name} -> ${field.name}")
+      field.modifiers = field.modifiers or AccessFlag.TRANSIENT
       ctClass.removeField(field)
       ctClass.addField(field,
           CtField.Initializer.byExpr("${Componentization.name}.getSafely(${field.type.name}.class)")
