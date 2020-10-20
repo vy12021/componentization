@@ -9,7 +9,6 @@ import javassist.CtField
 import javassist.bytecode.AccessFlag
 import java.io.File
 import java.io.IOException
-import java.lang.IllegalArgumentException
 import java.util.*
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
@@ -18,7 +17,9 @@ import java.util.zip.ZipEntry
 /**
  * Android插件提供的资源转换器
  */
-class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig): Transform() {
+class ComponentScanner(androidExt: AppExtension,
+                       private val config: ComponentizationConfig)
+  : Transform() {
 
   companion object {
     private const val PACKAGE = "com.bhb.android.componentization"
@@ -27,11 +28,40 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
     private const val ANNOTATION_API = "${PACKAGE}.Api"
     private const val ANNOTATION_SERVICE = "${PACKAGE}.Service"
     private const val ANNOTATION_AUTOWIRED = "${PACKAGE}.AutoWired"
+
+    /**
+     * 需要指定忽略的系统SDK相关包
+     */
+    private val IGNORE_ENTRY = arrayOf(
+            "android/", "androidx/",
+            "kotlin/", "kotlinx/",
+            "org/intellij/", "org/jetbrains/")
     init {
       ClassPool.cacheOpenedJarFile = false
       ClassPool.doPruning = false
       ClassPool.releaseUnmodifiedClassFile = true
     }
+  }
+
+  private val includes by lazy {
+    config.getIncludes().map { it.replace(".", "/") }
+  }
+
+  private val excludes by lazy {
+    mutableListOf<String>().apply {
+      addAll(IGNORE_ENTRY)
+      addAll(config.excludes.map { it.replace(".", "/") })
+    }
+  }
+
+  /**
+   * 检查扫描的class的文件节点路径是否在指定的范围
+   */
+  private fun checkClassEntry(classEntryName: String): Boolean {
+    if (includes.isNotEmpty()) {
+      return null != includes.find { classEntryName.startsWith(it) }
+    }
+    return null == excludes.find { classEntryName.startsWith(it) }
   }
 
   /**
@@ -44,7 +74,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
   /**
    * 是否调试模式
    */
-  private val DEBUG = config.debugMode
+  private val DEBUG by lazy { config.debugMode }
 
   private val registers = mutableSetOf<CtClass>()
 
@@ -69,6 +99,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
 
   override fun transform(transformInvocation: TransformInvocation) {
     println(">>>>>>>>>>>>>>>>>>>>>>启动扫描并注册和注入组件任务<<<<<<<<<<<<<<<<<<<<<<<")
+    println("插件配置：$config")
     val startTime = System.currentTimeMillis()
     super.transform(transformInvocation)
     allInputs = transformInvocation.inputs
@@ -144,7 +175,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
       if (input is JarInput) {
         val jarOutput = getOutput(input)
         // 子模块的类包名称
-        if (input.file.name == "classes.jar") {
+        if (input.file.extension == "jar") {
           transformComponentsFromJar(classPool, input).apply {
             classes.addAll(this)
             if (isNotEmpty()) {
@@ -158,8 +189,10 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
         val dirOutput = getOutput(input)
         // 目录先copy，然后覆盖被修改的类
         input.file.copyRecursively(dirOutput)
-        // 兼容java的classes目录和kotlin的kotlin-classes目录
-        if ((input.file.name == "classes" || input.file.parentFile.name == "kotlin-classes")) {
+        // 兼容java的classes目录和kotlin的kotlin-classes目录，或者其他的Transform中传递路径路径name为数字
+        if (input.file.name.toIntOrNull() != null
+                || input.file.name == "classes"
+                || input.file.parentFile.name == "kotlin-classes") {
           transformComponentsFromDir(classPool, input).apply {
             classes.addAll(this)
             forEach { clazz ->
@@ -184,13 +217,7 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
     val transformedClasses = mutableListOf<CtClass>()
     JarFile(jarInput.file).use {
       it.entries().toList().forEach { entry ->
-        val classEntryName: String = entry.name
-        if (!classEntryName.endsWith(".class")) {
-          return@forEach
-        }
-        if (DEBUG) println("\tclass file: $classEntryName")
-        collectComponentRegister(classPool, classEntryName)
-        transformComponentInject(classPool, classEntryName)?.let { transformedClass ->
+        transformFromEntryName(classPool, entry.name)?.let { transformedClass ->
           transformedClasses.add(transformedClass)
         }
       }
@@ -211,16 +238,25 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
       val classEntryName: String = classFile.absolutePath
               .substring(dirInput.file.absolutePath.length + 1)
               .replace("\\", "/")
-      if (!classEntryName.endsWith(".class")) {
-        return@forEach
-      }
-      if (DEBUG) println("\tclass file: $classEntryName")
-      collectComponentRegister(classPool, classEntryName)
-      transformComponentInject(classPool, classEntryName)?.let { transformedClass ->
+      transformFromEntryName(classPool, classEntryName)?.let { transformedClass ->
         transformedClasses.add(transformedClass)
       }
     }
     return transformedClasses
+  }
+
+  /**
+   * 从class索引节点转换
+   */
+  private fun transformFromEntryName(classPool: ClassPool, classEntryName: String): CtClass? {
+    if (classEntryName.startsWith("META-INF")
+            || !classEntryName.endsWith(".class")
+            || !checkClassEntry(classEntryName)) {
+      return null
+    }
+    if (DEBUG) println("\tclass file: $classEntryName")
+    collectComponentRegister(classPool, classEntryName)
+    return transformComponentInject(classPool, classEntryName)
   }
 
   /**
@@ -238,6 +274,9 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
    * 收集组件注册器
    */
   private fun collectComponentRegister(classPool: ClassPool, classEntryName: String) {
+    if (!classEntryName.replace("/", ".").startsWith(PACKAGE)) {
+      return
+    }
     val ctClass = getCtClassFromClassEntry(classPool, classEntryName)
     if (ctClass.packageName != PACKAGE) {
       return
@@ -338,15 +377,10 @@ class ComponentScanner(androidExt: AppExtension, config: ComponentizationConfig)
 
   private fun freeClassPoll(classPool: ClassPool, classPaths: List<ClassPath>) {
     // 释放classpath资源，关闭打开的io，清理导入缓存
-    var exception: Exception?
     getAllClasses(classPool).forEach { clazz ->
-      exception = null
       try {
         clazz.detach()
       } catch (ignored: Exception) {
-        exception = ignored
-      } finally {
-        if (DEBUG) println("detachClass: ${clazz.name} throws ${exception?.message ?: "null"}")
       }
     }
     /*val ClassPoolTail = ClassPool::class.java.getDeclaredField("source")

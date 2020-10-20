@@ -5,6 +5,8 @@ apply plugin: 'componentization'
 
 componentization {
   debugMode = true
+  includes = ['com.bhb.android']
+  excludes = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
 }
 
 android {

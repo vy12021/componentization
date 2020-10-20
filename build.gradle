@@ -9,6 +9,9 @@ buildscript {
     jcenter()
     mavenCentral()
     gradlePluginPortal()
+    maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    maven { url 'http://maven.aliyun.com/nexus/content/repositories/jcenter' }
+    maven { url 'https://maven.aliyun.com/repository/google' }
     maven {
       name "plugin"
       url "https://nexus.bhbcode.com/repository/android-plugin/"
@@ -24,7 +27,7 @@ buildscript {
   dependencies {
     classpath 'com.android.tools.build:gradle:4.1.0'
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.10"
-    classpath 'com.bhb.android.plugin:componentization:0.3.1'
+    classpath 'com.bhb.android.plugin:componentization:0.3.12'
   }
 }
 

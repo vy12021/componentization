@@ -15,10 +15,10 @@ class ComponentizationPlugin: Plugin<Project> {
     val config: ComponentizationConfig = try {
       project.extensions.create("componentization", ComponentizationConfig::class.java)
     } catch (e: Exception) {
+      e.printStackTrace()
       ComponentizationConfig()
-    } finally {
     }
-    println("获取到插件配置：${config}")
+    // 不能在此处使用扩展配置，需要至少在下一条任务中才能使用，此处扩展属性dsl并没有读取和装载
     android?.apply {
       println(">>>>>>>>>>>>>>>>>>>>>>>>注册扫描器ComponentScanner<<<<<<<<<<<<<<<<<<<<<<<<<")
       registerTransform(ComponentScanner(this, config))

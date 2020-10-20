@@ -17,6 +17,40 @@
 1. `app`: 入口模块，插件使用的地方。
 2. `lib`: 对于lib类型的处理测试。
 
+#### 接入
+1. 在根项目build.gradle文件中配置插件
+```groovy
+buildscript {
+  repositories {
+    maven {
+      name "plugin"
+      url "https://nexus.bhbcode.com/repository/android-plugin/"
+      credentials {
+        username mavenUsername
+        password mavenPassword
+      }
+      authentication {
+        basic(BasicAuthentication)
+      }
+    }  
+  }
+  
+  dependencies {
+    classpath 'com.bhb.android.plugin:componentization:0.3.12'
+  }
+}
+```
+2. 在application模块的build.gradle文件应用插件和配置
+```groovy
+apply plugin: 'componentization'
+
+componentization {
+  debugMode = true
+  includes = ['com.bhb.android']
+  excludes = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
+}
+```
+
 ### 示例用法
 1. 首先定义接口，并使用`Api`注解修饰，接口必须继承自`API`类，通常声明为XXXAPI
 ```kotlin
