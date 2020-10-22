@@ -9,8 +9,7 @@ class MainActivity: AppCompatActivity() {
 
   @AutoWired(lazy = true)
   lateinit var funAAPI: AppAPI
-  @AutoWired
-  lateinit var contextAPI: ContextAPI
+  private val contextAPI by lazy { Componentization.get(ContextAPI::class.java) }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)

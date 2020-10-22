@@ -12,8 +12,8 @@ import static org.junit.Assert.*;
 public class ExampleUnitTest {
   @Test
   public void addition_isCorrect() {
-    assertEquals(4, 2 + 2);
-
-    ComponentRegister.Item registerItem = new FunAService_Register().register();
+    LazyDelegateImpl<FunAAPI> lazyDelegate = new LazyDelegateImpl<FunAAPI>() {};
+    lazyDelegate.create();
+    lazyDelegate.get();
   }
 }

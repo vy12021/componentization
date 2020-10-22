@@ -11,4 +11,14 @@ class FunAService: FunAAPI, AppAPI {
     Toast.makeText(context, "class FunAService: mustImplInApp", Toast.LENGTH_SHORT).show()
   }
 
+  override fun aaaa() {
+  }
+
+  override fun bbb() {
+  }
+
+  override fun ccc(string: String): Boolean {
+    return true
+  }
+
 }
