@@ -1,8 +1,11 @@
-package com.bhb.android.componentization
+package com.bhb.android.app
 
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import com.bhb.android.componentization.AutoWired
+import com.bhb.android.componentization.Componentization
+import com.bhb.android.componentization.R
 import com.bhb.android.componentization.library.AppAPI
 
 class MainActivity: AppCompatActivity() {

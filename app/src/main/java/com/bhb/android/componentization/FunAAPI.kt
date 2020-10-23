@@ -1,6 +1,6 @@
 package com.bhb.android.componentization
 
-@Api
+@Api_
 interface FunAAPI: API {
 
   fun aaaa()

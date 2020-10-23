@@ -8,18 +8,24 @@ import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
+import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.TreeScanner;
 
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -34,8 +40,11 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
@@ -48,24 +57,32 @@ import javax.tools.Diagnostic;
 @IncrementalAnnotationProcessor(IncrementalAnnotationProcessorType.DYNAMIC)
 public final class ComponentizationProcessor extends AbstractProcessor {
 
+  private static final String PACKAGE_OUTPUT = "com.bhb.android.componentization";
+  private static final String ComponentRegister_SUFFIX = "_Register";
+  private static final String LazyDelegate_SUFFIX = "_Lazy";
+  private static final String ComponentRegister_Field_META = "meta";
+  private static final String LazyDelegate_Field_DELEGATE_SUFFIX = "Delegate";
   private static final TypeName ArrayListType = TypeName.get(ArrayList.class);
-  private static final String PACKAGE = "com.bhb.android.componentization";
-  private static final TypeName ComponentRegister = ClassName.get(
-          PACKAGE, "ComponentRegister");
-  private static final TypeName RegisterItem = ClassName.get(
-          PACKAGE, "ComponentRegister.Item");
-  private static final TypeName APIType = ClassName.get(
-          PACKAGE, "API");
+  private static final ClassName ComponentRegisterType = ClassName.get(
+          PACKAGE_OUTPUT, "ComponentRegister");
+  private static final ClassName RegisterItemType = ClassName.get(
+          PACKAGE_OUTPUT, "ComponentRegister.Item");
+  private static final ClassName APIType = ClassName.get(
+          PACKAGE_OUTPUT, "API");
+  private static final ClassName LazyDelegateType = ClassName.get(
+          PACKAGE_OUTPUT, "LazyDelegate");
+  private static final ClassName LazyDelegateImplType = ClassName.get(
+          PACKAGE_OUTPUT, "LazyDelegateImpl");
 
   private Types typeUtils;
   private Filer filer;
   private @Nullable Trees trees;
   private Messager logger;
+  private ApiMethodScanner methodScanner = new ApiMethodScanner();
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
     super.init(env);
-
     typeUtils = env.getTypeUtils();
     logger = env.getMessager();
     filer = env.getFiler();
@@ -105,7 +122,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
 
   private Set<Class<? extends Annotation>> getSupportedAnnotations() {
     Set<Class<? extends Annotation>> annotations = new LinkedHashSet<>();
-    annotations.add(Api.class);
+    // annotations.add(Api.class);
     annotations.add(Service.class);
     // annotations.add(AutoWired.class);
     return annotations;
@@ -118,11 +135,10 @@ public final class ComponentizationProcessor extends AbstractProcessor {
         continue;
       }
       try {
-        TypeSpec spec = build(element);
-        JavaFile file = JavaFile.builder(PACKAGE, spec)
-                .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
-        file.writeTo(filer);
+        generateRegisterClassFile(element);
+        generateLazyClassFile(element);
       } catch (Exception e) {
+        e.printStackTrace();
         logger.printMessage(Diagnostic.Kind.ERROR, e.getMessage());
         return false;
       }
@@ -130,10 +146,22 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     return false;
   }
 
-  private TypeSpec build(Element element) {
-    return TypeSpec.classBuilder(element.getSimpleName() + "_Register")
+  /**
+   * 生成注册类文件
+   * @param element 元素
+   * @throws IOException 写入异常
+   */
+  private void generateRegisterClassFile(Element element) throws IOException {
+    TypeSpec spec = buildRegisterClassFile(element);
+    JavaFile file = JavaFile.builder(PACKAGE_OUTPUT, spec)
+            .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
+    file.writeTo(filer);
+  }
+
+  private TypeSpec buildRegisterClassFile(Element element) {
+    return TypeSpec.classBuilder(element.getSimpleName() + ComponentRegister_SUFFIX)
             .addModifiers(Modifier.PUBLIC)
-            .addSuperinterface(ComponentRegister)
+            .addSuperinterface(ComponentRegisterType)
             .addMethod(buildRegisterMethod(element))
             .addField(buildRegisterField(element))
             .build();
@@ -142,7 +170,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private FieldSpec buildRegisterField(Element element) {
     Type serviceType = ((Symbol.ClassSymbol) element).asType();
     FieldSpec.Builder builder = FieldSpec.builder(
-            ClassName.get(String.class), "meta",
+            ClassName.get(String.class), ComponentRegister_Field_META,
             Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC);
     List<Type> apisType = getApiTypes(element);
     CodeBlock.Builder coder = CodeBlock.builder();
@@ -170,7 +198,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     List<Type> interfaces = ((Symbol.ClassSymbol) element).getInterfaces();
     List<Type> apisType = new ArrayList<>(interfaces.size());
     for (Type itf : interfaces) {
-      if (null != itf.asElement().getAnnotation(Api.class)) {
+      if (null != itf.asElement().getAnnotation(Api_.class)) {
         boolean isAPIType = false;
         for (Type sitf : ((Symbol.ClassSymbol) itf.tsym).getInterfaces()) {
           if (APIType.toString().equals(sitf.toString())) {
@@ -193,7 +221,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     MethodSpec.Builder builder =  MethodSpec.methodBuilder("register")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
-            .returns(RegisterItem);
+            .returns(RegisterItemType);
     Type serviceType = ((Symbol.ClassSymbol) element).asType();
     List<Type> apisType = getApiTypes(element);
     CodeBlock.Builder coder = CodeBlock.builder();
@@ -203,8 +231,126 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       coder.addStatement("apis.add($T.class)", TypeName.get(api));
     }
     builder.addCode(coder.build());
-    builder.addStatement("return new $T(apis, $T.class)", RegisterItem, TypeName.get(serviceType));
+    builder.addStatement("return new $T(apis, $T.class)", RegisterItemType, TypeName.get(serviceType));
     return builder.build();
+  }
+
+  /**
+   * 生成懒初始化代理类
+   * @param element Service元素
+   * @throws IOException 写入异常
+   */
+  private void generateLazyClassFile(Element element) throws IOException {
+    Type serviceType = ((Symbol.ClassSymbol) element).asType();
+    List<Type> apisType = getApiTypes(element);
+    TypeSpec.Builder typeBuilder = TypeSpec.classBuilder(
+            element.getSimpleName() + LazyDelegate_SUFFIX)
+            .addModifiers(Modifier.PUBLIC);
+    TypeName apiTypeName;
+    for (Type api : apisType) {
+      apiTypeName = TypeName.get(api);
+      // 添加Service上的所有api接口
+      typeBuilder.addSuperinterface(apiTypeName);
+      // 添加代理类变量
+      TypeName delegateType = ParameterizedTypeName.get(LazyDelegateType, apiTypeName);
+      String fieldName = ((ClassName) apiTypeName).simpleName() + LazyDelegate_Field_DELEGATE_SUFFIX;
+      FieldSpec.Builder fieldBuilder = FieldSpec.builder(
+              delegateType, fieldName)
+              .addModifiers(Modifier.PRIVATE)
+              .initializer("new $T<$T>() {}", LazyDelegateImplType, apiTypeName);
+      typeBuilder.addField(fieldBuilder.build());
+
+      // 添加接口方法实现
+      Iterator<Symbol> membersIterator = api.tsym.members().getElements().iterator();
+      Symbol member;
+      while (membersIterator.hasNext()) {
+        member = membersIterator.next();
+        if (member.getKind() != ElementKind.METHOD) {
+          // 只代理方法
+          continue;
+        }
+        Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) member;
+        if (methodSymbol.isPrivate() || methodSymbol.isStatic() || methodSymbol.isDynamic()) {
+          // 非公开成员方法不进行代理
+          continue;
+        }
+
+        // 方法名
+        String methodName = methodSymbol.getSimpleName().toString();
+        // 形参列表
+        List<Symbol.VarSymbol> params = methodSymbol.getParameters();
+        // 返回类型
+        Type returnType = methodSymbol.getReturnType();
+        boolean hasReturn = !(returnType instanceof Type.JCVoidType
+                || returnType.getKind() == TypeKind.VOID);
+        TypeName returnTypeName = TypeName.get(returnType);
+        MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
+                .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(Override.class)
+                .returns(returnTypeName);
+        CodeBlock.Builder methodBody = CodeBlock.builder();
+        if (hasReturn) {
+          methodBody.add("return ");
+        }
+        methodBody.add("$L.get().$L(", fieldName, methodName);
+        // 添加参数列表
+        Symbol.VarSymbol paramSymbol;
+        Iterator<Symbol.VarSymbol> paramIterator = params.iterator();
+        while (paramIterator.hasNext()) {
+          paramSymbol = paramIterator.next();
+          methodBuilder.addParameter(ParameterSpec.get(paramSymbol));
+          methodBody.add(paramSymbol.name.toString());
+          if (paramIterator.hasNext()) {
+            methodBody.add(", ");
+          }
+        }
+        methodBody.addStatement(")");
+        methodBuilder.addCode(methodBody.build());
+        typeBuilder.addMethod(methodBuilder.build());
+      }
+    }
+
+    // 写入文件
+    JavaFile.builder(PACKAGE_OUTPUT, typeBuilder.build())
+            .addFileComment("此文件为自动生成，用于组件化延迟代理")
+            .build()
+            .writeTo(filer);
+  }
+
+  /**
+   * 另一种语法树扫描策略
+   * @param element 根元素
+   */
+  private void findMethodByTreeScanner(Element element) {
+    methodScanner.reset();
+    ((JCTree) trees.getTree(element)).accept(methodScanner);
+    for (JCTree.JCMethodDecl methodDecl : methodScanner.methods) {
+      // 方法名
+      Name methodName = methodDecl.name;
+      // 修饰符public, static, synchronized ...
+      JCTree.JCModifiers modifiers = methodDecl.mods;
+      // 方法返回类型
+      JCTree.JCExpression returnType = methodDecl.restype;
+      // 方法的类型参数[泛型]
+      List<JCTree.JCTypeParameter> typarams = methodDecl.typarams;
+      // 方法形参列表
+      List<JCTree.JCVariableDecl> params = methodDecl.params;
+    }
+  }
+
+  private static class ApiMethodScanner extends TreeScanner {
+
+    private List<JCTree.JCMethodDecl> methods = new ArrayList<>();
+
+    private void reset() {
+      methods.clear();
+    }
+
+    @Override
+    public void visitMethodDef(JCTree.JCMethodDecl jcMethodDecl) {
+      super.visitMethodDef(jcMethodDecl);
+      methods.add(jcMethodDecl);
+    }
   }
 
 }

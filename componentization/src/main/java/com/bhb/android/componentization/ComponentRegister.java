@@ -8,6 +8,11 @@ import java.util.List;
  */
 public interface ComponentRegister {
 
+  /**
+   * 生成的代理类后缀
+   */
+  String SUFFIX = "_Register";
+
   Item register();
 
   class Item {

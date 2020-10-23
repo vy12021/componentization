@@ -89,7 +89,7 @@ public final class Componentization {
    */
   @SuppressWarnings("unchecked")
   public static <T extends API> T get(Class<T> type) throws ComponentException {
-    Api apiAnnotation = type.getAnnotation(Api.class);
+    Api_ apiAnnotation = type.getAnnotation(Api_.class);
     if (null == apiAnnotation) {
       throw new ComponentException("API接口需要被CApi注解修饰");
     }
@@ -107,6 +107,40 @@ public final class Componentization {
       return serviceInstance;
     }
     return makeInstance(service);
+  }
+
+  /**
+   * 尝试获取指定api延迟初始化实现
+   * @param type api接口
+   * @param <T>  类型
+   * @return     api实现：必须被AService注解修饰
+   */
+  @SuppressWarnings("unchecked")
+  public static <T extends API> T getLazy(Class<T> type) throws ComponentException {
+    try {
+      Class<? extends LazyDelegate<T>> lazyClazz
+              = loadClass(type.getName() + LazyDelegate.SUFFIX);
+      return (T) lazyClazz.newInstance();
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw new ComponentException("组件[" + type.getCanonicalName() + "]无法支持延迟初始化特性");
+    }
+  }
+
+  /**
+   * 尝试获取指定api延迟初始化实现，自动向下降低为非延迟初始化
+   * @param type api接口
+   * @param <T>  类型
+   * @return     api实现：必须被AService注解修饰
+   */
+  public static <T extends API> T getLazySafely(Class<T> type) {
+    try {
+      return getLazy(type);
+    } catch (ComponentException e) {
+      e.printStackTrace();
+      Log.e(TAG, Log.getStackTraceString(e));
+      return getSafely(type);
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -127,6 +161,23 @@ public final class Componentization {
       }
     }
     return serviceInstance;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> Class<T> loadClass(String className) throws ComponentException {
+    Class<T> clazz;
+    try {
+      clazz = (Class<T>) Class.forName(className);
+    } catch (ClassNotFoundException e) {
+      e.printStackTrace();
+      try {
+        clazz = (Class<T>) Thread.currentThread().getContextClassLoader().loadClass(className);
+      } catch (ClassNotFoundException e1) {
+        Log.e(TAG, Log.getStackTraceString(e1));
+        throw new ComponentException(e1.getMessage(), e1.getCause());
+      }
+    }
+    return clazz;
   }
 
 }

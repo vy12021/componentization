@@ -1,5 +1,7 @@
 package com.bhb.android.plugin.componentization;
 
+import java.util.Arrays;
+
 /**
  * 组件扫描配置
  * 通过"componentization"扩展dsl来注入配置
@@ -43,6 +45,12 @@ public class ComponentizationConfig {
     this.debugMode = debugMode;
   }
 
-
-
+  @Override
+  public String toString() {
+    return "ComponentizationConfig{" +
+            "debugMode=" + debugMode +
+            ", includes=" + Arrays.toString(includes) +
+            ", excludes=" + Arrays.toString(excludes) +
+            '}';
+  }
 }

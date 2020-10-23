@@ -1,6 +1,8 @@
 package com.bhb.android.componentization;
 
-@Api
-public interface TestAPI /*extends API */{
-  void doSomething();
+import java.util.List;
+
+@Api_
+public interface TestAPI extends API {
+  String doSomething(String aaa, Boolean bbb, List<Integer> ccc);
 }

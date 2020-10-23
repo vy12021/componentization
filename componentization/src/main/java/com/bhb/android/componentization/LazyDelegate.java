@@ -8,6 +8,11 @@ package com.bhb.android.componentization;
 public interface LazyDelegate<C extends API> {
 
   /**
+   * 生成的代理类后缀
+   */
+  String SUFFIX = "_Lazy";
+
+  /**
    * 创建实例对象
    * @return C
    */

@@ -16,19 +16,22 @@ public class ServiceTest {
     JavaFileObject source = JavaFileObjects.forSourceString("test.TestService", ""
             + "package test;\n"
             + "import java.lang.Override;\n"
-            + "import com.bhb.android.componentization.CService;\n"
+            + "import java.util.List;\n"
+            + "import com.bhb.android.componentization.Service;\n"
             + "import com.bhb.android.componentization.TestAPI;\n"
-            + "@CService\n"
+            + "@Service\n"
             + "public class TestService implements TestAPI {\n"
 
-            + "  @Override public void doSomething() {\n"
+            + "  @Override public String doSomething(String aaa, Boolean bbb, List<Integer> ccc) {\n"
+            + "    return \"\";"
             + "    \n"
             + "  }\n"
 
             + "}"
     );
 
-    JavaFileObject bindingSource = JavaFileObjects.forSourceString("com.bhb.android.componentization/Test_Register", ""
+    JavaFileObject bindingSource = JavaFileObjects.forSourceString(
+            "com.bhb.android.componentization/TestService_Register", ""
             + "package test;\n"
             + "import android.util.Pair;\n"
             + "import java.lang.Override;\n"
@@ -36,7 +39,7 @@ public class ServiceTest {
             + "import com.bhb.android.componentization.API;\n"
             + "import com.bhb.android.componentization.ComponentRegister;\n"
             + "import com.bhb.android.componentization.TestAPI;\n"
-            + "public class Test_Register implements ComponentRegister {\n"
+            + "public class TestService_Register implements ComponentRegister {\n"
             + "  @Override public ComponentRegister.Item register() {\n"
             + "    final ArrayList<Class<? extends API> apis = new ArrayList<>(1);\n"
             + "    apis.add(TestAPI.class);\n"

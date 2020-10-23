@@ -18,8 +18,7 @@ import java.util.zip.ZipEntry
  * Android插件提供的资源转换器
  */
 class ComponentScanner(androidExt: AppExtension,
-                       private val config: ComponentizationConfig)
-  : Transform() {
+                       private val config: ComponentizationConfig): Transform() {
 
   companion object {
     private const val PACKAGE = "com.bhb.android.componentization"
@@ -30,12 +29,17 @@ class ComponentScanner(androidExt: AppExtension,
     private const val ANNOTATION_AUTOWIRED = "${PACKAGE}.AutoWired"
 
     /**
-     * 需要指定忽略的系统SDK相关包
+     * 需要指定包含的内部class包
+     */
+    private val INCLUDE_ENTRY = arrayOf(PACKAGE)
+    /**
+     * 需要指定忽略的系统class包
      */
     private val IGNORE_ENTRY = arrayOf(
             "android/", "androidx/",
             "kotlin/", "kotlinx/",
             "org/intellij/", "org/jetbrains/")
+
     init {
       ClassPool.cacheOpenedJarFile = false
       ClassPool.doPruning = false
@@ -44,21 +48,27 @@ class ComponentScanner(androidExt: AppExtension,
   }
 
   private val includes by lazy {
-    config.getIncludes().map { it.replace(".", "/") }
+    mutableListOf<String>().apply {
+      addAll(INCLUDE_ENTRY)
+      addAll(config.includes.toList())
+    }.map { it.replace(".", "/") }
   }
 
   private val excludes by lazy {
     mutableListOf<String>().apply {
       addAll(IGNORE_ENTRY)
-      addAll(config.excludes.map { it.replace(".", "/") })
-    }
+      addAll(config.excludes.toList())
+    }.map { it.replace(".", "/") }
   }
 
   /**
    * 检查扫描的class的文件节点路径是否在指定的范围
    */
   private fun checkClassEntry(classEntryName: String): Boolean {
-    if (includes.isNotEmpty()) {
+    if (null != INCLUDE_ENTRY.find { classEntryName.startsWith(it) }) {
+      return true
+    }
+    if (config.includes.isNotEmpty()) {
       return null != includes.find { classEntryName.startsWith(it) }
     }
     return null == excludes.find { classEntryName.startsWith(it) }
@@ -175,7 +185,7 @@ class ComponentScanner(androidExt: AppExtension,
       if (input is JarInput) {
         val jarOutput = getOutput(input)
         // 子模块的类包名称
-        if (input.file.extension == "jar") {
+        if (input.file.extension == "jar" && input.file.nameWithoutExtension != "R") {
           transformComponentsFromJar(classPool, input).apply {
             classes.addAll(this)
             if (isNotEmpty()) {
@@ -299,13 +309,15 @@ class ComponentScanner(androidExt: AppExtension,
     ctClass.declaredFields.filter { it.hasAnnotation(AutoWired.name) }.forEach {field ->
       if (DEBUG) println("\ttransformComponentInject: ${ctClass.name} -> ${field.name}")
       field.modifiers = field.modifiers or AccessFlag.TRANSIENT
+      val annotation = field.getAnnotation(AutoWired.toClass())
+      val lazyMethod = annotation.javaClass.getDeclaredMethod("lazy")
+      val lazyMode = lazyMethod.invoke(annotation) as Boolean
       ctClass.removeField(field)
       ctClass.addField(field,
-          CtField.Initializer.byExpr("${Componentization.name}.getSafely(${field.type.name}.class)")
+          CtField.Initializer.byExpr(Componentization.name +
+                  ".${if (lazyMode) "getLazySafely" else "getSafely"}" +
+                  "(${field.type.name}.class)")
       )
-      if (ctClass.isKotlin) {
-        // todo 延迟初始化实现
-      }
       hasChanged = true
     }
     ctClass.freeze()

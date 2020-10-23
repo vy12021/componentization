@@ -1,8 +1,9 @@
-package com.bhb.android.componentization
+package com.bhb.android.app
 
 import android.app.Application
 import android.content.Context
 import android.widget.Toast
+import com.bhb.android.componentization.Service
 
 @Service
 class TheApplication: Application(), ContextAPI {
