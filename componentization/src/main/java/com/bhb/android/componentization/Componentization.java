@@ -13,16 +13,25 @@ import java.util.Map;
  */
 public final class Componentization {
 
+  /**
+   * log tag
+   */
   private static final String TAG = "Componentization";
+
+  /**
+   * 全包名
+   */
+  private static final String PACKAGE = Componentization.class.getPackage().getName();
 
   /**
    * 收集到的组件注册信息
    */
-  private static Map<Class<? extends API>, Class<? extends API>> sComponentProvider;
+  private final static Map<Class<? extends API>, Class<? extends API>>
+          sComponentProvider = new HashMap<>();
   /**
    * 单例组件存储
    */
-  private static Map<Class<? extends API>, API> sComponents;
+  private final static Map<Class<? extends API>, API> sComponents = new HashMap<>();
 
   /**
    * 手动注册
@@ -46,12 +55,6 @@ public final class Componentization {
    * 执行指定组件器
    */
   private static void register(Class<? extends ComponentRegister> register) {
-    if (null == sComponentProvider) {
-      sComponentProvider = new HashMap<>();
-    }
-    if (null == sComponents) {
-      sComponents = new HashMap<>();
-    }
     try {
       Log.e(TAG, "register: " + register);
       ComponentRegister.Item registerItem = register.newInstance().register();
@@ -89,9 +92,9 @@ public final class Componentization {
    */
   @SuppressWarnings("unchecked")
   public static <T extends API> T get(Class<T> type) throws ComponentException {
-    Api_ apiAnnotation = type.getAnnotation(Api_.class);
+    Api apiAnnotation = type.getAnnotation(Api.class);
     if (null == apiAnnotation) {
-      throw new ComponentException("API接口需要被CApi注解修饰");
+      throw new ComponentException("API接口需要被Api注解修饰");
     }
     Class<T> service = (Class<T>) sComponentProvider.get(type);
     if (null == service) {
@@ -118,8 +121,10 @@ public final class Componentization {
   @SuppressWarnings("unchecked")
   public static <T extends API> T getLazy(Class<T> type) throws ComponentException {
     try {
+      type = null != type.getAnnotation(Service.class)
+              ? type : (Class<T>) sComponentProvider.get(type);
       Class<? extends LazyDelegate<T>> lazyClazz
-              = loadClass(type.getName() + LazyDelegate.SUFFIX);
+              = loadClass(PACKAGE + "." + type.getSimpleName() + LazyDelegate.SUFFIX);
       return (T) lazyClazz.newInstance();
     } catch (Exception e) {
       e.printStackTrace();

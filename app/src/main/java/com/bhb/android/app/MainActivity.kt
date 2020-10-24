@@ -4,15 +4,15 @@ import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.bhb.android.componentization.AutoWired
-import com.bhb.android.componentization.Componentization
 import com.bhb.android.componentization.R
 import com.bhb.android.componentization.library.AppAPI
 
 class MainActivity: AppCompatActivity() {
 
+  @AutoWired
+  private lateinit var funAAPI: AppAPI
   @AutoWired(lazy = true)
-  lateinit var funAAPI: AppAPI
-  private val contextAPI by lazy { Componentization.get(ContextAPI::class.java) }
+  private lateinit var contextAPI: ContextAPI
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)

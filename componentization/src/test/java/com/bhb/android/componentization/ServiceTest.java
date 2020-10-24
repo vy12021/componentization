@@ -17,14 +17,14 @@ public class ServiceTest {
             + "package test;\n"
             + "import java.lang.Override;\n"
             + "import java.util.List;\n"
+            + "import java.io.Serializable;\n"
             + "import com.bhb.android.componentization.Service;\n"
             + "import com.bhb.android.componentization.TestAPI;\n"
             + "@Service\n"
             + "public class TestService implements TestAPI {\n"
 
-            + "  @Override public String doSomething(String aaa, Boolean bbb, List<Integer> ccc) {\n"
-            + "    return \"\";"
-            + "    \n"
+            + "  @Override public <T extends Serializable> T doSomething(T p) {\n"
+            + "    return p;\n"
             + "  }\n"
 
             + "}"

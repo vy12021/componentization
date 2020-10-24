@@ -1,8 +1,8 @@
 package com.bhb.android.componentization;
 
-import java.util.List;
+import java.io.Serializable;
 
-@Api_
+@Api
 public interface TestAPI extends API {
-  String doSomething(String aaa, Boolean bbb, List<Integer> ccc);
+  <T extends Serializable> T doSomething(T p);
 }

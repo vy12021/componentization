@@ -7,6 +7,8 @@ import javassist.ClassPool
 import javassist.CtClass
 import javassist.CtField
 import javassist.bytecode.AccessFlag
+import javassist.bytecode.AnnotationsAttribute
+import javassist.bytecode.annotation.BooleanMemberValue
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -304,22 +306,18 @@ class ComponentScanner(androidExt: AppExtension,
   private fun transformComponentInject(classPool: ClassPool, classEntryName: String): CtClass? {
     var hasChanged = false
     val ctClass = getCtClassFromClassEntry(classPool, classEntryName)
-    val Componentization = classPool.get(COMPONENTIZATION)
-    val AutoWired = classPool.get(ANNOTATION_AUTOWIRED)
-    ctClass.declaredFields.filter { it.hasAnnotation(AutoWired.name) }.forEach {field ->
+    ctClass.declaredFields.filter { it.hasAnnotation(ANNOTATION_AUTOWIRED) }.forEach {field ->
       if (DEBUG) println("\ttransformComponentInject: ${ctClass.name} -> ${field.name}")
       field.modifiers = field.modifiers or AccessFlag.TRANSIENT
-      val lazyMode = field.availableAnnotations.find {
-        println("annotation: ${it.javaClass}")
-        it.javaClass.name == AutoWired.name
-      }?.let {annotation ->
-        annotation.javaClass.getDeclaredMethod("lazy").let {lazyMethod ->
-          lazyMethod.invoke(annotation) as Boolean
+      val lazyMode = (field.fieldInfo.getAttribute(AnnotationsAttribute.visibleTag)
+              as? AnnotationsAttribute)?.let {attribute ->
+        attribute.getAnnotation(ANNOTATION_AUTOWIRED)?.let {annotation ->
+          (annotation.getMemberValue("lazy") as? BooleanMemberValue)?.value
         }
       } ?: false
       ctClass.removeField(field)
       ctClass.addField(field,
-          CtField.Initializer.byExpr(Componentization.name +
+          CtField.Initializer.byExpr(COMPONENTIZATION +
                   ".${if (lazyMode) "getLazySafely" else "getSafely"}" +
                   "(${field.type.name}.class)")
       )
@@ -342,7 +340,7 @@ class ComponentScanner(androidExt: AppExtension,
     }
     registerBody.append("}")
     (Componentization.classInitializer?: Componentization.makeClassInitializer())
-        .setBody(registerBody.toString())
+        .insertAfter(registerBody.toString())
     return Componentization
   }
 

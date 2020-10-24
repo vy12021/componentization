@@ -5,7 +5,7 @@ package com.bhb.android.componentization;
  *
  * @param <C> 被代理类
  */
-public interface LazyDelegate<C extends API> {
+interface LazyDelegate<C extends API> {
 
   /**
    * 生成的代理类后缀

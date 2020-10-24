@@ -2,9 +2,9 @@ package com.bhb.android.componentization.library
 
 import android.content.Context
 import com.bhb.android.componentization.API
-import com.bhb.android.componentization.Api_
+import com.bhb.android.componentization.Api
 
-@Api_
+@Api
 interface AppAPI: API {
 
   fun mustImplInApp(context: Context)

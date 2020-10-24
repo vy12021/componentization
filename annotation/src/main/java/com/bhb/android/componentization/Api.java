@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface Api_ {
+public @interface Api {
 
   /**
    * 是否单例模式，且必须存在静态INSTANCE引用，可以和kotlin单例对象保持兼容

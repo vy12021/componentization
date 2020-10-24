@@ -12,6 +12,7 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
+import com.squareup.javapoet.TypeVariableName;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
@@ -152,19 +153,15 @@ public final class ComponentizationProcessor extends AbstractProcessor {
    * @throws IOException 写入异常
    */
   private void generateRegisterClassFile(Element element) throws IOException {
-    TypeSpec spec = buildRegisterClassFile(element);
-    JavaFile file = JavaFile.builder(PACKAGE_OUTPUT, spec)
-            .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
-    file.writeTo(filer);
-  }
-
-  private TypeSpec buildRegisterClassFile(Element element) {
-    return TypeSpec.classBuilder(element.getSimpleName() + ComponentRegister_SUFFIX)
-            .addModifiers(Modifier.PUBLIC)
+    TypeSpec.Builder typeBuilder = TypeSpec.classBuilder(
+            element.getSimpleName() + ComponentRegister_SUFFIX)
+            .addModifiers(Modifier.FINAL)
             .addSuperinterface(ComponentRegisterType)
             .addMethod(buildRegisterMethod(element))
-            .addField(buildRegisterField(element))
-            .build();
+            .addField(buildRegisterField(element));
+    JavaFile file = JavaFile.builder(PACKAGE_OUTPUT, typeBuilder.build())
+            .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
+    file.writeTo(filer);
   }
 
   private FieldSpec buildRegisterField(Element element) {
@@ -198,7 +195,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     List<Type> interfaces = ((Symbol.ClassSymbol) element).getInterfaces();
     List<Type> apisType = new ArrayList<>(interfaces.size());
     for (Type itf : interfaces) {
-      if (null != itf.asElement().getAnnotation(Api_.class)) {
+      if (null != itf.asElement().getAnnotation(Api.class)) {
         boolean isAPIType = false;
         for (Type sitf : ((Symbol.ClassSymbol) itf.tsym).getInterfaces()) {
           if (APIType.toString().equals(sitf.toString())) {
@@ -244,8 +241,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     Type serviceType = ((Symbol.ClassSymbol) element).asType();
     List<Type> apisType = getApiTypes(element);
     TypeSpec.Builder typeBuilder = TypeSpec.classBuilder(
-            element.getSimpleName() + LazyDelegate_SUFFIX)
-            .addModifiers(Modifier.PUBLIC);
+            element.getSimpleName() + LazyDelegate_SUFFIX);
     TypeName apiTypeName;
     for (Type api : apisType) {
       apiTypeName = TypeName.get(api);
@@ -284,9 +280,15 @@ public final class ComponentizationProcessor extends AbstractProcessor {
         boolean hasReturn = !(returnType instanceof Type.JCVoidType
                 || returnType.getKind() == TypeKind.VOID);
         TypeName returnTypeName = TypeName.get(returnType);
+        List<Symbol.TypeVariableSymbol> typeParameters = methodSymbol.getTypeParameters();
+        List<TypeVariableName> typeVariableNames = new ArrayList<>(typeParameters.size());
+        for (Symbol.TypeVariableSymbol typeVariableSymbol : typeParameters) {
+          typeVariableNames.add(TypeVariableName.get(typeVariableSymbol));
+        }
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addModifiers(Modifier.PUBLIC)
                 .addAnnotation(Override.class)
+                .addTypeVariables(typeVariableNames)
                 .returns(returnTypeName);
         CodeBlock.Builder methodBody = CodeBlock.builder();
         if (hasReturn) {
