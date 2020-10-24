@@ -309,9 +309,14 @@ class ComponentScanner(androidExt: AppExtension,
     ctClass.declaredFields.filter { it.hasAnnotation(AutoWired.name) }.forEach {field ->
       if (DEBUG) println("\ttransformComponentInject: ${ctClass.name} -> ${field.name}")
       field.modifiers = field.modifiers or AccessFlag.TRANSIENT
-      val annotation = field.getAnnotation(AutoWired.toClass())
-      val lazyMethod = annotation.javaClass.getDeclaredMethod("lazy")
-      val lazyMode = lazyMethod.invoke(annotation) as Boolean
+      val lazyMode = field.availableAnnotations.find {
+        println("annotation: ${it.javaClass}")
+        it.javaClass.name == AutoWired.name
+      }?.let {annotation ->
+        annotation.javaClass.getDeclaredMethod("lazy").let {lazyMethod ->
+          lazyMethod.invoke(annotation) as Boolean
+        }
+      } ?: false
       ctClass.removeField(field)
       ctClass.addField(field,
           CtField.Initializer.byExpr(Componentization.name +
