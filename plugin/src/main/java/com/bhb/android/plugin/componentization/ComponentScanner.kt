@@ -49,17 +49,17 @@ class ComponentScanner(androidExt: AppExtension,
     }
   }
 
-  private val includes by lazy {
+  private val includePackages by lazy {
     mutableListOf<String>().apply {
       addAll(INCLUDE_ENTRY)
-      addAll(config.includes.toList())
+      addAll(config.includePackages.toList())
     }.map { it.replace(".", "/") }
   }
 
-  private val excludes by lazy {
+  private val excludePackages by lazy {
     mutableListOf<String>().apply {
       addAll(IGNORE_ENTRY)
-      addAll(config.excludes.toList())
+      addAll(config.excludePackages.toList())
     }.map { it.replace(".", "/") }
   }
 
@@ -70,10 +70,10 @@ class ComponentScanner(androidExt: AppExtension,
     if (null != INCLUDE_ENTRY.find { classEntryName.startsWith(it) }) {
       return true
     }
-    if (config.includes.isNotEmpty()) {
-      return null != includes.find { classEntryName.startsWith(it) }
+    if (config.includePackages.isNotEmpty()) {
+      return null != includePackages.find { classEntryName.startsWith(it) }
     }
-    return null == excludes.find { classEntryName.startsWith(it) }
+    return null == excludePackages.find { classEntryName.startsWith(it) }
   }
 
   /**
@@ -403,7 +403,6 @@ class ComponentScanner(androidExt: AppExtension,
     val ClassPathList = ClassPoolTail.javaClass.getDeclaredField("pathList")
         .apply { isAccessible = true }.get(ClassPoolTail)*/
     classPaths.forEach { classpath ->
-      if (DEBUG) println("removeClassPath: $classpath")
       classPool.removeClassPath(classpath)
     }
     classPool.clearImportedPackages()

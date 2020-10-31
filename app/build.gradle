@@ -5,17 +5,14 @@ apply plugin: 'componentization'
 
 componentization {
   debugMode = true
-  includes = ['com.bhb.android']
-  excludes = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
+  includeModules = ['app', '^libra.*']
+  includePackages = ['com.bhb.android']
+  excludePackages = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
 }
 
-android {
-
-}
 
 dependencies {
   implementation project(':componentization')
-  implementation project(':library')
   annotationProcessor project(':compiler')
   kapt project(':compiler')
 }

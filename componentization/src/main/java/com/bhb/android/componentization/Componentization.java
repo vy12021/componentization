@@ -114,12 +114,13 @@ public final class Componentization {
 
   /**
    * 尝试获取指定api延迟初始化实现
-   * @param type api接口
+   * @param apiType api接口
    * @param <T>  类型
    * @return     api实现：必须被AService注解修饰
    */
   @SuppressWarnings("unchecked")
-  public static <T extends API> T getLazy(Class<T> type) throws ComponentException {
+  public static <T extends API> T getLazy(Class<T> apiType) throws ComponentException {
+    Class<T> type = apiType;
     try {
       type = null != type.getAnnotation(Service.class)
               ? type : (Class<T>) sComponentProvider.get(type);
@@ -128,7 +129,7 @@ public final class Componentization {
       return (T) lazyClazz.newInstance();
     } catch (Exception e) {
       e.printStackTrace();
-      throw new ComponentException("组件[" + type.getCanonicalName() + "]无法支持延迟初始化特性");
+      throw new ComponentException("组件[" + apiType.getCanonicalName() + "]无法支持延迟初始化特性");
     }
   }
 
@@ -177,7 +178,7 @@ public final class Componentization {
       e.printStackTrace();
       try {
         clazz = (Class<T>) Thread.currentThread().getContextClassLoader().loadClass(className);
-      } catch (ClassNotFoundException e1) {
+      } catch (Exception e1) {
         Log.e(TAG, Log.getStackTraceString(e1));
         throw new ComponentException(e1.getMessage(), e1.getCause());
       }

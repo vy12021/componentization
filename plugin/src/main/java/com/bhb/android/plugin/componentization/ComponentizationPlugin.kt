@@ -22,7 +22,30 @@ class ComponentizationPlugin: Plugin<Project> {
     android?.apply {
       println(">>>>>>>>>>>>>>>>>>>>>>>>注册扫描器ComponentScanner<<<<<<<<<<<<<<<<<<<<<<<<<")
       registerTransform(ComponentScanner(this, config))
+      project.afterEvaluate {
+        project.dependencies.apply {
+          project.rootProject.subprojects {subProject ->
+            if (subProject.name != project.name &&
+                    matchProject(config.includeModules, subProject)) {
+              println("${project.name} implementation ${subProject.name}")
+              add("implementation", subProject)
+            }
+          }
+        }
+      }
     }
+  }
+
+  private fun matchProject(includeModules: Array<String>, subProject: Project): Boolean {
+    println("matchProject: ${includeModules.contentToString()}, ${subProject.name}")
+    if (subProject.hasProperty(ComponentizationConfig.PROPERTY_MODULE)) {
+      (subProject.findProperty(ComponentizationConfig.PROPERTY_MODULE) as? String)?.toBoolean()?.let {
+        if (it) return true
+      }
+    }
+    return includeModules.find {moduleName ->
+      subProject.name == moduleName || subProject.name.matches(moduleName.toRegex())
+    } != null
   }
 
 }
