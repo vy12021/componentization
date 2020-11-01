@@ -6,6 +6,7 @@ apply plugin: 'componentization'
 componentization {
   debugMode = true
   includeModules = ['app', '^libra.*']
+  includeJars = ['clase']
   includePackages = ['com.bhb.android']
   excludePackages = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
 }

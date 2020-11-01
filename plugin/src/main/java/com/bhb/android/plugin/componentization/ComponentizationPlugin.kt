@@ -29,6 +29,7 @@ class ComponentizationPlugin: Plugin<Project> {
                     matchProject(config.includeModules, subProject)) {
               println("${project.name} implementation ${subProject.name}")
               add("implementation", subProject)
+              config.addModule(subProject.projectDir.absolutePath)
             }
           }
         }

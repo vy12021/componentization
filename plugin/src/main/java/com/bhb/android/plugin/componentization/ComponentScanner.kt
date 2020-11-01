@@ -49,6 +49,20 @@ class ComponentScanner(androidExt: AppExtension,
     }
   }
 
+  private val includeJars by lazy {
+    mutableListOf<String>().apply {
+      add("classes")
+      add(".*-componentization-.*")
+      addAll(config.includeJars.toList())
+    }
+  }
+
+  private val excludeJars by lazy {
+    mutableListOf<String>().apply {
+      add("R")
+    }
+  }
+
   private val includePackages by lazy {
     mutableListOf<String>().apply {
       addAll(INCLUDE_ENTRY)
@@ -61,6 +75,25 @@ class ComponentScanner(androidExt: AppExtension,
       addAll(IGNORE_ENTRY)
       addAll(config.excludePackages.toList())
     }.map { it.replace(".", "/") }
+  }
+
+  private fun checkInputJar(jarFile: File): Boolean {
+    if (jarFile.extension != "jar") {
+      return false
+    }
+    val findJar = fun (includes: List<String>): String? {
+      return includes.find {
+        config.modulesDir.find { moduleDir -> jarFile.absolutePath.startsWith(moduleDir) } != null
+            && (jarFile.nameWithoutExtension == it || jarFile.nameWithoutExtension.matches(it.toRegex()))
+      }
+    }
+    findJar(includeJars)?.let {
+      return true
+    }
+    if (config.includeJars.isNotEmpty()) {
+      return false
+    }
+    return findJar(excludeJars) == null
   }
 
   /**
@@ -187,7 +220,7 @@ class ComponentScanner(androidExt: AppExtension,
       if (input is JarInput) {
         val jarOutput = getOutput(input)
         // 子模块的类包名称
-        if (input.file.extension == "jar" && input.file.nameWithoutExtension != "R") {
+        if (checkInputJar(input.file)) {
           transformComponentsFromJar(classPool, input).apply {
             classes.addAll(this)
             if (isNotEmpty()) {

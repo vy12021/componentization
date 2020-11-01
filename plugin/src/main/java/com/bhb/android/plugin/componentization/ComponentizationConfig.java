@@ -1,6 +1,8 @@
 package com.bhb.android.plugin.componentization;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * 组件扫描配置
@@ -22,6 +24,10 @@ public class ComponentizationConfig {
    */
   String[] includeModules = new String[0];
   /**
+   * 支持扫描的jar包
+   */
+  String[] includeJars = new String[0];
+  /**
    * 扫描包名列表，长度不为空表示启用白名单
    */
   String[] includePackages = new String[0];
@@ -29,6 +35,10 @@ public class ComponentizationConfig {
    * 忽略扫描包列表，如果白名单命中，则跳过黑名单
    */
   String[] excludePackages = new String[0];
+  /**
+   * 被导入的模块目录
+   */
+  List<String> modulesDir = new ArrayList<>();
 
   public String[] getIncludeModules() {
     return includeModules;
@@ -36,6 +46,14 @@ public class ComponentizationConfig {
 
   public void setIncludeModules(String[] includeModules) {
     this.includeModules = includeModules;
+  }
+
+  public String[] getIncludeJars() {
+    return includeJars;
+  }
+
+  public void setIncludeJars(String[] includeJars) {
+    this.includeJars = includeJars;
   }
 
   public String[] getIncludePackages() {
@@ -60,6 +78,10 @@ public class ComponentizationConfig {
 
   public void setDebugMode(boolean debugMode) {
     this.debugMode = debugMode;
+  }
+
+  void addModule(String... modules) {
+    this.modulesDir.addAll(Arrays.asList(modules));
   }
 
   @Override
