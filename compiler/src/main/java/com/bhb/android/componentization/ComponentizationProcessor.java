@@ -428,8 +428,8 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       }
       return methodSymbol;
     }
-    logger.printMessage(Diagnostic.Kind.MANDATORY_WARNING,
-            "无法在[" + service.toString() + "]中找到[" + apiMethod.toString() + "]");
+    /*logger.printMessage(Diagnostic.Kind.MANDATORY_WARNING,
+            "无法在[" + service.toString() + "]中找到[" + apiMethod.toString() + "]");*/
     return apiMethod;
   }
 

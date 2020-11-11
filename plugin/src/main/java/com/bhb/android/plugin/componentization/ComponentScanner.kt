@@ -7,6 +7,7 @@ import javassist.ClassPool
 import javassist.CtClass
 import javassist.CtField
 import javassist.bytecode.AccessFlag
+import javassist.bytecode.AnnotationDefaultAttribute
 import javassist.bytecode.AnnotationsAttribute
 import javassist.bytecode.annotation.BooleanMemberValue
 import java.io.File
@@ -341,6 +342,11 @@ class ComponentScanner(androidExt: AppExtension,
   private fun transformComponentInject(classPool: ClassPool, classEntryName: String): CtClass? {
     var hasChanged = false
     val ctClass = getCtClassFromClassEntry(classPool, classEntryName)
+    val defaultMode = classPool.get(ANNOTATION_AUTOWIRED).getDeclaredMethod("lazy")
+        .methodInfo.let {methodInfo ->
+          ((methodInfo.getAttribute(AnnotationDefaultAttribute.tag)
+              as AnnotationDefaultAttribute).defaultValue as BooleanMemberValue).value
+    }
     ctClass.declaredFields.filter { it.hasAnnotation(ANNOTATION_AUTOWIRED) }.forEach {field ->
       if (DEBUG) println("\ttransformComponentInject: ${ctClass.name} -> ${field.name}")
       field.modifiers = field.modifiers or AccessFlag.TRANSIENT
@@ -349,7 +355,7 @@ class ComponentScanner(androidExt: AppExtension,
         attribute.getAnnotation(ANNOTATION_AUTOWIRED)?.let {annotation ->
           (annotation.getMemberValue("lazy") as? BooleanMemberValue)?.value
         }
-      } ?: false
+      } ?: defaultMode
       ctClass.removeField(field)
       ctClass.addField(field,
           CtField.Initializer.byExpr(COMPONENTIZATION +

@@ -101,15 +101,20 @@ public final class Componentization {
       throw new ComponentException("组件[" + type.getCanonicalName() + "]没有找到，清查找是否有实现");
     }
     if (apiAnnotation.singleton()) {
-      // 检查INSTANCE静态引用
       T serviceInstance = (T) sComponents.get(type);
       if (null != serviceInstance) {
         return serviceInstance;
       }
-      sComponents.put(type, serviceInstance = makeInstance(service));
+      serviceInstance = makeInstance(service, true);
+      if (null == serviceInstance) {
+        throw new ComponentException(
+            "组件[" + type.getCanonicalName() + "]存在循环单例引用，" +
+            "请务必打开延迟初始化模式，这样可以规避由于实例同时请求建立引发的赋值冲突");
+      }
+      sComponents.put(type, serviceInstance);
       return serviceInstance;
     }
-    return makeInstance(service);
+    return makeInstance(service, false);
   }
 
   /**
@@ -150,7 +155,7 @@ public final class Componentization {
   }
 
   @SuppressWarnings("unchecked")
-  private static <T extends API> T makeInstance(Class<T> service) {
+  private static <T extends API> T makeInstance(Class<T> service, boolean singleton) {
     T serviceInstance = null;
     try {
       Field INSTANCE = service.getDeclaredField("INSTANCE");
@@ -158,15 +163,24 @@ public final class Componentization {
       serviceInstance = (T) INSTANCE.get(null);
     } catch (Exception e) {
       e.printStackTrace();
-      try {
-        Constructor<? extends API> constructor = service.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        serviceInstance = (T) constructor.newInstance();
-      } catch (Exception e1) {
-        e1.printStackTrace();
+    } finally {
+      if (!singleton && null == serviceInstance) {
+        serviceInstance = newInstance(service);
       }
     }
     return serviceInstance;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T extends API> T newInstance(Class<T> service) {
+    try {
+      Constructor<? extends API> constructor = service.getDeclaredConstructor();
+      constructor.setAccessible(true);
+      return (T) constructor.newInstance();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return null;
   }
 
   @SuppressWarnings("unchecked")

@@ -2,11 +2,15 @@ package com.bhb.android.app
 
 import android.content.Context
 import android.widget.Toast
+import com.bhb.android.componentization.AutoWired
 import com.bhb.android.componentization.Service
 import com.bhb.android.componentization.library.AppAPI
 
 @Service
-class FunAService: FunAAPI, AppAPI {
+object FunAService: FunAAPI, AppAPI {
+
+  @AutoWired
+  private lateinit var contextAPI: ContextAPI
 
   override fun mustImplInApp(context: Context) {
     Toast.makeText(context, "class FunAService: mustImplInApp", Toast.LENGTH_SHORT).show()
