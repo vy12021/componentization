@@ -3,6 +3,7 @@ package com.bhb.android.componentization;
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
 import com.google.common.collect.ImmutableSet;
+import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -14,6 +15,7 @@ import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
 import com.sun.source.util.Trees;
+import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.tree.JCTree;
@@ -171,11 +173,11 @@ public final class ComponentizationProcessor extends AbstractProcessor {
             Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC);
     List<Type> apisType = getApiTypes(element);
     CodeBlock.Builder coder = CodeBlock.builder();
-    coder.add("\"" + TypeName.get(serviceType).toString() + ";");
+    coder.add("\"" + getRawType(TypeName.get(serviceType)).toString() + ";");
     Type api;
     for (int i = 0, len = apisType.size(); i < len; i++) {
       api = apisType.get(i);
-      coder.add(TypeName.get(api).toString());
+      coder.add(getRawType(TypeName.get(api)).toString());
       if (i < len - 1) {
         coder.add(",");
       }
@@ -192,26 +194,50 @@ public final class ComponentizationProcessor extends AbstractProcessor {
    */
   private List<Type> getApiTypes(Element element) {
     Type serviceType = ((Symbol.ClassSymbol) element).asType();
-    List<Type> interfaces = ((Symbol.ClassSymbol) element).getInterfaces();
+    List<Type> interfaces = getAllInterfaces(serviceType);
     List<Type> apisType = new ArrayList<>(interfaces.size());
     for (Type itf : interfaces) {
-      if (null != itf.asElement().getAnnotation(Api.class)) {
-        boolean isAPIType = false;
-        for (Type sitf : ((Symbol.ClassSymbol) itf.tsym).getInterfaces()) {
-          if (APIType.toString().equals(sitf.toString())) {
-            isAPIType = true;
-          }
-        }
-        if (!isAPIType) {
-          throw new RuntimeException(itf.toString() + "的父接口必须为API类型");
-        }
-        apisType.add(itf);
+      if (null == itf.asElement().getAnnotation(Api.class)) {
+        continue;
       }
+      boolean isAPIType = false;
+      for (Type sitf : getAllInterfaces(itf)) {
+        if (APIType.toString().equals(sitf.toString())) {
+          isAPIType = true;
+        }
+      }
+      if (!isAPIType) {
+        throw new RuntimeException(itf.toString() + "的父接口必须为API类型");
+      }
+      apisType.add(itf);
     }
     if (apisType.isEmpty()) {
-      throw new RuntimeException(serviceType.toString() + "的父接口中必须至少有一个被Api注解修饰");
+      throw new RuntimeException(serviceType.toString() + "的父接口中必须至少有一个被Api注解修饰的API接口类");
     }
     return apisType;
+  }
+
+  private List<Type> getAllInterfaces(Type type) {
+    List<Type> interfaces = new ArrayList<>();
+    if (type.isInterface()) {
+      interfaces.add(type);
+      for (Type itf : ((Symbol.ClassSymbol) type.tsym).getInterfaces()) {
+        interfaces.addAll(getAllInterfaces(itf));
+      }
+    } else {
+      if (null != type.asElement().getAnnotation(Api.class)) {
+        logger.printMessage(Diagnostic.Kind.MANDATORY_WARNING,
+                type.toString() + "：@Api注解不支持非接口类型");
+      }
+      Type superType = ((Symbol.ClassSymbol) type.tsym).getSuperclass();
+      if (null != superType && superType.getKind() != TypeKind.NONE) {
+        interfaces.addAll(getAllInterfaces(superType));
+      }
+      for (Type itf : ((Symbol.ClassSymbol) type.tsym).getInterfaces()) {
+        interfaces.addAll(getAllInterfaces(itf));
+      }
+    }
+    return interfaces;
   }
 
   private MethodSpec buildRegisterMethod(Element element) {
@@ -224,11 +250,14 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     CodeBlock.Builder coder = CodeBlock.builder();
     coder.addStatement("final $T<Class<? extends $T>> apis = new $T<>($L)",
             ArrayListType, APIType, ArrayListType, apisType.size());
+    TypeName typeName;
     for (Type api : apisType) {
-      coder.addStatement("apis.add($T.class)", TypeName.get(api));
+      typeName = TypeName.get(api);
+      coder.addStatement("apis.add($T.class)", getRawType(typeName));
     }
+    typeName = TypeName.get(serviceType);
     builder.addCode(coder.build());
-    builder.addStatement("return new $T(apis, $T.class)", RegisterItemType, TypeName.get(serviceType));
+    builder.addStatement("return new $T(apis, $T.class)", RegisterItemType, getRawType(typeName));
     return builder.build();
   }
 
@@ -239,76 +268,29 @@ public final class ComponentizationProcessor extends AbstractProcessor {
    */
   private void generateLazyClassFile(Element element) throws IOException {
     Type serviceType = ((Symbol.ClassSymbol) element).asType();
-    List<Type> apisType = getApiTypes(element);
+    List<Type> apis = getApiTypes(element);
     TypeSpec.Builder typeBuilder = TypeSpec.classBuilder(
             element.getSimpleName() + LazyDelegate_SUFFIX);
     TypeName apiTypeName;
-    for (Type api : apisType) {
+    List<Type> interfaces;
+    for (Type api : apis) {
       apiTypeName = TypeName.get(api);
+      interfaces = getAllInterfaces(api);
       // 添加Service上的所有api接口
       typeBuilder.addSuperinterface(apiTypeName);
       // 添加代理类变量
       TypeName delegateType = ParameterizedTypeName.get(LazyDelegateType, apiTypeName);
-      String fieldName = ((ClassName) apiTypeName).simpleName() + LazyDelegate_Field_DELEGATE_SUFFIX;
+      String fieldName = ((ClassName) getRawType(apiTypeName)).simpleName()
+              + LazyDelegate_Field_DELEGATE_SUFFIX;
       FieldSpec.Builder fieldBuilder = FieldSpec.builder(
               delegateType, fieldName)
               .addModifiers(Modifier.PRIVATE)
               .initializer("new $T<$T>() {}", LazyDelegateImplType, apiTypeName);
       typeBuilder.addField(fieldBuilder.build());
-
-      // 添加接口方法实现
-      Iterator<Symbol> membersIterator = api.tsym.members().getElements().iterator();
-      Symbol member;
-      while (membersIterator.hasNext()) {
-        member = membersIterator.next();
-        if (member.getKind() != ElementKind.METHOD) {
-          // 只代理方法
-          continue;
+      for (Type intf : interfaces) {
+        for (MethodSpec method : generateMethod(serviceType, intf, fieldName)) {
+          typeBuilder.addMethod(method);
         }
-        Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) member;
-        if (methodSymbol.isPrivate() || methodSymbol.isStatic() || methodSymbol.isDynamic()) {
-          // 非公开成员方法不进行代理
-          continue;
-        }
-
-        // 方法名
-        String methodName = methodSymbol.getSimpleName().toString();
-        // 形参列表
-        List<Symbol.VarSymbol> params = methodSymbol.getParameters();
-        // 返回类型
-        Type returnType = methodSymbol.getReturnType();
-        boolean hasReturn = !(returnType instanceof Type.JCVoidType
-                || returnType.getKind() == TypeKind.VOID);
-        TypeName returnTypeName = TypeName.get(returnType);
-        List<Symbol.TypeVariableSymbol> typeParameters = methodSymbol.getTypeParameters();
-        List<TypeVariableName> typeVariableNames = new ArrayList<>(typeParameters.size());
-        for (Symbol.TypeVariableSymbol typeVariableSymbol : typeParameters) {
-          typeVariableNames.add(TypeVariableName.get(typeVariableSymbol));
-        }
-        MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
-                .addModifiers(Modifier.PUBLIC)
-                .addAnnotation(Override.class)
-                .addTypeVariables(typeVariableNames)
-                .returns(returnTypeName);
-        CodeBlock.Builder methodBody = CodeBlock.builder();
-        if (hasReturn) {
-          methodBody.add("return ");
-        }
-        methodBody.add("$L.get().$L(", fieldName, methodName);
-        // 添加参数列表
-        Symbol.VarSymbol paramSymbol;
-        Iterator<Symbol.VarSymbol> paramIterator = params.iterator();
-        while (paramIterator.hasNext()) {
-          paramSymbol = paramIterator.next();
-          methodBuilder.addParameter(ParameterSpec.get(paramSymbol));
-          methodBody.add(paramSymbol.name.toString());
-          if (paramIterator.hasNext()) {
-            methodBody.add(", ");
-          }
-        }
-        methodBody.addStatement(")");
-        methodBuilder.addCode(methodBody.build());
-        typeBuilder.addMethod(methodBuilder.build());
       }
     }
 
@@ -317,6 +299,143 @@ public final class ComponentizationProcessor extends AbstractProcessor {
             .addFileComment("此文件为自动生成，用于组件化延迟代理")
             .build()
             .writeTo(filer);
+  }
+
+  private List<MethodSpec> generateMethod(Type service, Type api, String delegateField) {
+    List<MethodSpec> methodSpecs = new ArrayList<>();
+    // 添加接口方法实现
+    Iterator<Symbol> membersIterator = api.tsym.members().getElements().iterator();
+    Symbol member;
+    while (membersIterator.hasNext()) {
+      member = membersIterator.next();
+      if (member.getKind() != ElementKind.METHOD) {
+        // 只代理方法
+        continue;
+      }
+      Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) member;
+      if (methodSymbol.isPrivate() || methodSymbol.isStatic() || methodSymbol.isDynamic()) {
+        // 非公开成员方法不进行代理
+        continue;
+      }
+      methodSymbol = getMethodSymbol(service, methodSymbol);
+      // 方法名
+      String methodName = methodSymbol.getSimpleName().toString();
+      // 形参列表
+      List<Symbol.VarSymbol> params = methodSymbol.getParameters();
+      // 返回类型
+      Type returnType = methodSymbol.getReturnType();
+      boolean hasReturn = !(returnType instanceof Type.JCVoidType
+              || returnType.getKind() == TypeKind.VOID);
+      TypeName returnTypeName = TypeName.get(returnType);
+      List<Attribute.Compound> annotationTypes = methodSymbol.getAnnotationMirrors();
+      List<AnnotationSpec> annotationSpecs = new ArrayList<>(annotationTypes.size());
+      for (Attribute.Compound annotation : annotationTypes) {
+        annotationSpecs.add(AnnotationSpec.get(annotation));
+      }
+      List<Symbol.TypeVariableSymbol> typeParameters = methodSymbol.getTypeParameters();
+      List<TypeVariableName> typeVariableNames = new ArrayList<>(typeParameters.size());
+      for (Symbol.TypeVariableSymbol typeVariableSymbol : typeParameters) {
+        typeVariableNames.add(TypeVariableName.get(typeVariableSymbol));
+      }
+      List<Type> thrownTypes = methodSymbol.getThrownTypes();
+      List<TypeName> thrownTypeNames = new ArrayList<>(thrownTypes.size());
+      for (Type thrownType : thrownTypes) {
+        thrownTypeNames.add(TypeName.get(thrownType));
+      }
+      MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
+              .addModifiers(Modifier.PUBLIC)
+              .addAnnotations(annotationSpecs)
+              .addTypeVariables(typeVariableNames)
+              .addExceptions(thrownTypeNames)
+              .returns(returnTypeName);
+      CodeBlock.Builder methodBody = CodeBlock.builder();
+      if (hasReturn) {
+        methodBody.add("return ");
+      }
+      methodBody.add("$L.get().$L(", delegateField, methodName);
+      // 添加参数列表
+      Symbol.VarSymbol paramSymbol;
+      Iterator<Symbol.VarSymbol> paramIterator = params.iterator();
+      while (paramIterator.hasNext()) {
+        paramSymbol = paramIterator.next();
+        methodBuilder.addParameter(ParameterSpec.get(paramSymbol));
+        methodBody.add(paramSymbol.name.toString());
+        if (paramIterator.hasNext()) {
+          methodBody.add(", ");
+        }
+      }
+      methodBody.addStatement(")");
+      methodBuilder.addCode(methodBody.build());
+      methodSpecs.add(methodBuilder.build());
+    }
+    return methodSpecs;
+  }
+
+  /**
+   * 从Service类型中查找对应的实现api，便于做类型映射，接口中涉及到泛型擦除，可能已经丢失掉一部分信息
+   * 匹配方式为函数签名：methodName(Params...)
+   * @param service   实现类型
+   * @param apiMethod 当前需要查找的api
+   * @return 实现方法
+   */
+  private Symbol.MethodSymbol getMethodSymbol(Type service, Symbol.MethodSymbol apiMethod) {
+    String apiMethodName = apiMethod.getSimpleName().toString();
+    List<Symbol.VarSymbol> apiParams = apiMethod.getParameters();
+    Type apiReturnType = apiMethod.getReturnType();
+    Iterator<Symbol> memberIterator = service.asElement().members().getElements().iterator();
+    Symbol member;
+    while (memberIterator.hasNext()) {
+      member = memberIterator.next();
+      if (member.getKind() != ElementKind.METHOD) {
+        continue;
+      }
+      Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) member;
+      if (methodSymbol.isPrivate() || methodSymbol.isStatic() || methodSymbol.isDynamic()) {
+        continue;
+      }
+      // 方法名
+      String methodName = methodSymbol.getSimpleName().toString();
+      // 形参列表
+      List<Symbol.VarSymbol> params = methodSymbol.getParameters();
+      // 返回类型
+      Type returnType = methodSymbol.getReturnType();
+      // 比对名称
+      if (!methodName.equals(apiMethodName)) {
+        continue;
+      }
+      // 返回值都不是泛型类型时进行严格比对
+      if (returnType.getKind() != TypeKind.TYPEVAR && apiReturnType.getKind() != TypeKind.TYPEVAR
+              && returnType != apiReturnType) {
+        continue;
+      }
+      if (params.size() != apiParams.size()) {
+        continue;
+      }
+      Type paramType;
+      Type apiParamType;
+      boolean paramsValid = true;
+      for (int pi = 0; pi < params.size(); pi++) {
+        paramType = params.get(pi).type;
+        apiParamType = apiParams.get(pi).type;
+        if (paramType.getKind() != TypeKind.TYPEVAR && apiParamType.getKind() != TypeKind.TYPEVAR
+                && paramType != apiParamType) {
+          paramsValid = false;
+          break;
+        }
+      }
+      if (!paramsValid) {
+        continue;
+      }
+      return methodSymbol;
+    }
+    logger.printMessage(Diagnostic.Kind.MANDATORY_WARNING,
+            "无法在[" + service.toString() + "]中找到[" + apiMethod.toString() + "]");
+    return apiMethod;
+  }
+
+  private TypeName getRawType(TypeName typeName) {
+    return typeName instanceof ParameterizedTypeName
+            ? ((ParameterizedTypeName) typeName).rawType : typeName;
   }
 
   /**

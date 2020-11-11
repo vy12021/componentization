@@ -22,4 +22,5 @@ class FunAService: FunAAPI, AppAPI {
     return true
   }
 
+  override fun abstractA(): String = "我是父接口"
 }

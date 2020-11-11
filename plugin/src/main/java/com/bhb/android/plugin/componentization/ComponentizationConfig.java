@@ -80,7 +80,7 @@ public class ComponentizationConfig {
     this.debugMode = debugMode;
   }
 
-  void addModule(String... modules) {
+  void addModuleDir(String... modules) {
     this.modulesDir.addAll(Arrays.asList(modules));
   }
 
@@ -88,8 +88,11 @@ public class ComponentizationConfig {
   public String toString() {
     return "ComponentizationConfig{" +
             "debugMode=" + debugMode +
-            ", includes=" + Arrays.toString(includePackages) +
-            ", excludes=" + Arrays.toString(excludePackages) +
+            ", includeModules=" + Arrays.toString(includeModules) +
+            ", includeJars=" + Arrays.toString(includeJars) +
+            ", includePackages=" + Arrays.toString(includePackages) +
+            ", excludePackages=" + Arrays.toString(excludePackages) +
+            ", modulesDir=" + modulesDir +
             '}';
   }
 }

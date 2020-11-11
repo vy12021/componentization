@@ -23,6 +23,10 @@ public class ServiceTest {
             + "@Service\n"
             + "public class TestService implements TestAPI {\n"
 
+            + "  @Override public <V extends Serializable> Boolean get(V input, Integer number) {\n"
+            + "    return true;\n"
+            + "  }\n"
+
             + "  @Override public <T extends Serializable> T doSomething(T p) {\n"
             + "    return p;\n"
             + "  }\n"

@@ -1,10 +1,9 @@
 package com.bhb.android.app
 
-import com.bhb.android.componentization.API
 import com.bhb.android.componentization.Api
 
 @Api
-interface FunAAPI: API {
+interface FunAAPI: AbstractAPI<String> {
 
   fun aaaa()
 

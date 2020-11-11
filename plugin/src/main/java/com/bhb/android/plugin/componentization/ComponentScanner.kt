@@ -81,10 +81,12 @@ class ComponentScanner(androidExt: AppExtension,
     if (jarFile.extension != "jar") {
       return false
     }
+    if (null == config.modulesDir.find { jarFile.absolutePath.startsWith(it) }) {
+      return false
+    }
     val findJar = fun (includes: List<String>): String? {
       return includes.find {
-        config.modulesDir.find { moduleDir -> jarFile.absolutePath.startsWith(moduleDir) } != null
-            && (jarFile.nameWithoutExtension == it || jarFile.nameWithoutExtension.matches(it.toRegex()))
+        jarFile.nameWithoutExtension == it || jarFile.nameWithoutExtension.matches(it.toRegex())
       }
     }
     findJar(includeJars)?.let {
