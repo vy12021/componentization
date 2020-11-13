@@ -53,29 +53,30 @@ import javax.tools.Diagnostic;
 
 /**
  * 组件相关注解处理
- * Created by Tesla on 2019/12/20.
+ * Created by Tesla on 2020/09/30.
  */
 @AutoService(Processor.class)
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @IncrementalAnnotationProcessor(IncrementalAnnotationProcessorType.DYNAMIC)
 public final class ComponentizationProcessor extends AbstractProcessor {
 
-  private static final String PACKAGE_OUTPUT = "com.bhb.android.componentization";
+  private static final String PACKAGE_SPACE = "com.bhb.android.componentization";
   private static final String ComponentRegister_SUFFIX = "_Register";
   private static final String LazyDelegate_SUFFIX = "_Lazy";
-  private static final String ComponentRegister_Field_META = "meta";
   private static final String LazyDelegate_Field_DELEGATE_SUFFIX = "Delegate";
   private static final TypeName ArrayListType = TypeName.get(ArrayList.class);
   private static final ClassName ComponentRegisterType = ClassName.get(
-          PACKAGE_OUTPUT, "ComponentRegister");
+          PACKAGE_SPACE, "ComponentRegister");
   private static final ClassName RegisterItemType = ClassName.get(
-          PACKAGE_OUTPUT, "ComponentRegister.Item");
+          PACKAGE_SPACE, "ComponentRegister.Item");
   private static final ClassName APIType = ClassName.get(
-          PACKAGE_OUTPUT, "API");
+          PACKAGE_SPACE, "API");
   private static final ClassName LazyDelegateType = ClassName.get(
-          PACKAGE_OUTPUT, "LazyDelegate");
+          PACKAGE_SPACE, "LazyDelegate");
   private static final ClassName LazyDelegateImplType = ClassName.get(
-          PACKAGE_OUTPUT, "LazyDelegateImpl");
+          PACKAGE_SPACE, "LazyDelegateImpl");
+  private static final ClassName AnnotationMetaType = ClassName.get(
+          PACKAGE_SPACE, "Meta");
 
   private Types typeUtils;
   private Filer filer;
@@ -160,23 +161,47 @@ public final class ComponentizationProcessor extends AbstractProcessor {
             .addModifiers(Modifier.FINAL)
             .addSuperinterface(ComponentRegisterType)
             .addMethod(buildRegisterMethod(element))
-            .addField(buildRegisterField(element));
-    JavaFile file = JavaFile.builder(PACKAGE_OUTPUT, typeBuilder.build())
+            // .addField(buildRegisterField(element))
+            .addAnnotation(buildRegisterMeta(element));
+    JavaFile file = JavaFile.builder(PACKAGE_SPACE, typeBuilder.build())
             .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
     file.writeTo(filer);
+  }
+
+  private AnnotationSpec buildRegisterMeta(Element element) {
+    Type serviceType = ((Symbol.ClassSymbol) element).asType();
+    AnnotationSpec.Builder builder = AnnotationSpec.builder(AnnotationMetaType);
+    // 添加Service描述
+    builder.addMember("service", "$S",
+            getRawType(TypeName.get(serviceType)).toString());
+    // 添加API列表描述
+    List<Type> apiTypes = getApiTypes(element);
+    CodeBlock.Builder coder = CodeBlock.builder();
+    coder.add("{");
+    Type api;
+    for (int i = 0, len = apiTypes.size(); i < len; i++) {
+      api = apiTypes.get(i);
+      coder.add("$S", getRawType(TypeName.get(api)).toString());
+      if (i < len - 1) {
+        coder.add(", ");
+      }
+    }
+    coder.add("}");
+    builder.addMember("api", coder.build());
+    return builder.build();
   }
 
   private FieldSpec buildRegisterField(Element element) {
     Type serviceType = ((Symbol.ClassSymbol) element).asType();
     FieldSpec.Builder builder = FieldSpec.builder(
-            ClassName.get(String.class), ComponentRegister_Field_META,
+            ClassName.get(String.class), "meta",
             Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC);
-    List<Type> apisType = getApiTypes(element);
+    List<Type> apiTypes = getApiTypes(element);
     CodeBlock.Builder coder = CodeBlock.builder();
     coder.add("\"" + getRawType(TypeName.get(serviceType)).toString() + ";");
     Type api;
-    for (int i = 0, len = apisType.size(); i < len; i++) {
-      api = apisType.get(i);
+    for (int i = 0, len = apiTypes.size(); i < len; i++) {
+      api = apiTypes.get(i);
       coder.add(getRawType(TypeName.get(api)).toString());
       if (i < len - 1) {
         coder.add(",");
@@ -212,7 +237,8 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       apisType.add(itf);
     }
     if (apisType.isEmpty()) {
-      throw new RuntimeException(serviceType.toString() + "的父接口中必须至少有一个被Api注解修饰的API接口类");
+      throw new RuntimeException(
+              serviceType.toString() + "的父接口中必须至少有一个被Api注解修饰的API接口类");
     }
     return apisType;
   }
@@ -241,7 +267,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   }
 
   private MethodSpec buildRegisterMethod(Element element) {
-    MethodSpec.Builder builder =  MethodSpec.methodBuilder("register")
+    MethodSpec.Builder builder = MethodSpec.methodBuilder("register")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .returns(RegisterItemType);
@@ -295,7 +321,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     }
 
     // 写入文件
-    JavaFile.builder(PACKAGE_OUTPUT, typeBuilder.build())
+    JavaFile.builder(PACKAGE_SPACE, typeBuilder.build())
             .addFileComment("此文件为自动生成，用于组件化延迟代理")
             .build()
             .writeTo(filer);

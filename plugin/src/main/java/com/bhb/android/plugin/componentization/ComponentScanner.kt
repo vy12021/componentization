@@ -9,7 +9,9 @@ import javassist.CtField
 import javassist.bytecode.AccessFlag
 import javassist.bytecode.AnnotationDefaultAttribute
 import javassist.bytecode.AnnotationsAttribute
+import javassist.bytecode.annotation.ArrayMemberValue
 import javassist.bytecode.annotation.BooleanMemberValue
+import javassist.bytecode.annotation.StringMemberValue
 import java.io.File
 import java.io.IOException
 import java.util.*
@@ -19,6 +21,7 @@ import java.util.zip.ZipEntry
 
 /**
  * Android插件提供的资源转换器
+ * Created by Tesla on 2020/09/30.
  */
 class ComponentScanner(androidExt: AppExtension,
                        private val config: ComponentizationConfig): Transform() {
@@ -30,6 +33,7 @@ class ComponentScanner(androidExt: AppExtension,
     private const val ANNOTATION_API = "${PACKAGE}.Api"
     private const val ANNOTATION_SERVICE = "${PACKAGE}.Service"
     private const val ANNOTATION_AUTOWIRED = "${PACKAGE}.AutoWired"
+    private const val ANNOTATION_META = "${PACKAGE}.Meta"
 
     /**
      * 需要指定包含的内部class包
@@ -419,13 +423,23 @@ class ComponentScanner(androidExt: AppExtension,
    * 检查注册器和组件的正确性，例如：一个api接口不能同时有两个service实现
    */
   private fun checkRegisterValid(classPool: ClassPool) {
-    val registerMetas = mutableMapOf<CtClass, CtClass>()
+    val registerMetas = mutableMapOf<String, String>()
     registers.forEach {register ->
-      val pair = (register.getField("meta").constantValue as String).split(";".toRegex())
-      val service = classPool.get(pair[0])
-      pair[1].split(",".toRegex()).map { classPool.get(it) }.forEach {
-        registerMetas.put(it, service)?.apply {
-          throw IllegalArgumentException("${it.name}接口发现重复实现${service.name}和${this.name}")
+      if (!register.hasAnnotation(ANNOTATION_META)) {
+        throw IllegalArgumentException("${register.name}缺失@${ANNOTATION_META}注解描述")
+      }
+      (register.classFile2.getAttribute(AnnotationsAttribute.invisibleTag)
+              as AnnotationsAttribute).getAnnotation(ANNOTATION_META).apply {
+        val serviceType = (getMemberValue("service") as StringMemberValue).value
+        val apiTypes = (getMemberValue("api") as ArrayMemberValue).value.map {
+          (it as StringMemberValue).value
+        }
+        apiTypes.forEach {apiType ->
+          registerMetas.put(apiType, serviceType)?.let {lastService ->
+            throw IllegalArgumentException(
+                    "接口 [${apiType}] 发现重复实现: \n" +
+                    "${serviceType}, ${lastService}")
+          }
         }
       }
     }

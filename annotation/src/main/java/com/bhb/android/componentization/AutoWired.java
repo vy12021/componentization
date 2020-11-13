@@ -15,7 +15,7 @@ public @interface AutoWired {
 
   /**
    * 是否延迟初始化，具体实现参照LazyDelegate
-   * @return 默认立即初始化
+   * @return 默认延迟初始化
    */
   boolean lazy() default true;
 

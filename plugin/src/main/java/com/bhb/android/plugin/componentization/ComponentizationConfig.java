@@ -7,6 +7,7 @@ import java.util.List;
 /**
  * 组件扫描配置
  * 通过"componentization"扩展dsl来注入配置
+ * Created by Tesla on 2020/09/30.
  */
 public class ComponentizationConfig {
 

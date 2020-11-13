@@ -6,13 +6,16 @@ import org.gradle.api.Project
 
 /**
  * 组件收集和自动化注入插件
+ * Created by Tesla on 2020/09/30.
  */
 class ComponentizationPlugin: Plugin<Project> {
+
+  private lateinit var config: ComponentizationConfig
 
   override fun apply(project: Project) {
     println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin<<<<<<<<<<<<<<<<<<<<<<")
     val android = project.extensions.findByType(AppExtension::class.java)
-    val config: ComponentizationConfig = try {
+    config = try {
       project.extensions.create("componentization", ComponentizationConfig::class.java)
     } catch (e: Exception) {
       e.printStackTrace()
@@ -38,7 +41,6 @@ class ComponentizationPlugin: Plugin<Project> {
   }
 
   private fun matchProject(includeModules: Array<String>, subProject: Project): Boolean {
-    println("matchProject: ${includeModules.contentToString()}, ${subProject.name}")
     if (subProject.hasProperty(ComponentizationConfig.PROPERTY_MODULE)) {
       (subProject.findProperty(ComponentizationConfig.PROPERTY_MODULE) as? String)?.toBoolean()?.let {
         if (it) return true
