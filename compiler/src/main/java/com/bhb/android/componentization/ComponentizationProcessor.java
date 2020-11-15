@@ -18,8 +18,6 @@ import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.TreeScanner;
 
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType;
@@ -45,7 +43,6 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
-import javax.lang.model.element.Name;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.Types;
@@ -82,7 +79,6 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private Filer filer;
   private @Nullable Trees trees;
   private Messager logger;
-  private ApiMethodScanner methodScanner = new ApiMethodScanner();
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
@@ -161,7 +157,6 @@ public final class ComponentizationProcessor extends AbstractProcessor {
             .addModifiers(Modifier.FINAL)
             .addSuperinterface(ComponentRegisterType)
             .addMethod(buildRegisterMethod(element))
-            // .addField(buildRegisterField(element))
             .addAnnotation(buildRegisterMeta(element));
     JavaFile file = JavaFile.builder(PACKAGE_SPACE, typeBuilder.build())
             .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
@@ -188,27 +183,6 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     }
     coder.add("}");
     builder.addMember("api", coder.build());
-    return builder.build();
-  }
-
-  private FieldSpec buildRegisterField(Element element) {
-    Type serviceType = ((Symbol.ClassSymbol) element).asType();
-    FieldSpec.Builder builder = FieldSpec.builder(
-            ClassName.get(String.class), "meta",
-            Modifier.PRIVATE, Modifier.FINAL, Modifier.STATIC);
-    List<Type> apiTypes = getApiTypes(element);
-    CodeBlock.Builder coder = CodeBlock.builder();
-    coder.add("\"" + getRawType(TypeName.get(serviceType)).toString() + ";");
-    Type api;
-    for (int i = 0, len = apiTypes.size(); i < len; i++) {
-      api = apiTypes.get(i);
-      coder.add(getRawType(TypeName.get(api)).toString());
-      if (i < len - 1) {
-        coder.add(",");
-      }
-    }
-    coder.add("\"");
-    builder.initializer(coder.build());
     return builder.build();
   }
 
@@ -358,6 +332,9 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       for (Attribute.Compound annotation : annotationTypes) {
         annotationSpecs.add(AnnotationSpec.get(annotation));
       }
+      if (member == methodSymbol) {
+        annotationSpecs.add(AnnotationSpec.builder(Override.class).build());
+      }
       List<Symbol.TypeVariableSymbol> typeParameters = methodSymbol.getTypeParameters();
       List<TypeVariableName> typeVariableNames = new ArrayList<>(typeParameters.size());
       for (Symbol.TypeVariableSymbol typeVariableSymbol : typeParameters) {
@@ -454,50 +431,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       }
       return methodSymbol;
     }
-    /*logger.printMessage(Diagnostic.Kind.MANDATORY_WARNING,
-            "无法在[" + service.toString() + "]中找到[" + apiMethod.toString() + "]");*/
     return apiMethod;
   }
 
   private TypeName getRawType(TypeName typeName) {
     return typeName instanceof ParameterizedTypeName
             ? ((ParameterizedTypeName) typeName).rawType : typeName;
-  }
-
-  /**
-   * 另一种语法树扫描策略
-   * @param element 根元素
-   */
-  private void findMethodByTreeScanner(Element element) {
-    methodScanner.reset();
-    ((JCTree) trees.getTree(element)).accept(methodScanner);
-    for (JCTree.JCMethodDecl methodDecl : methodScanner.methods) {
-      // 方法名
-      Name methodName = methodDecl.name;
-      // 修饰符public, static, synchronized ...
-      JCTree.JCModifiers modifiers = methodDecl.mods;
-      // 方法返回类型
-      JCTree.JCExpression returnType = methodDecl.restype;
-      // 方法的类型参数[泛型]
-      List<JCTree.JCTypeParameter> typarams = methodDecl.typarams;
-      // 方法形参列表
-      List<JCTree.JCVariableDecl> params = methodDecl.params;
-    }
-  }
-
-  private static class ApiMethodScanner extends TreeScanner {
-
-    private List<JCTree.JCMethodDecl> methods = new ArrayList<>();
-
-    private void reset() {
-      methods.clear();
-    }
-
-    @Override
-    public void visitMethodDef(JCTree.JCMethodDecl jcMethodDecl) {
-      super.visitMethodDef(jcMethodDecl);
-      methods.add(jcMethodDecl);
-    }
   }
 
 }
