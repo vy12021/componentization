@@ -12,6 +12,8 @@ class ComponentizationPlugin: Plugin<Project> {
 
   private lateinit var config: ComponentizationConfig
 
+  private val annotationConfig = "com.bhb.android.componentization:compiler:0.4.7.4"
+
   override fun apply(project: Project) {
     println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin<<<<<<<<<<<<<<<<<<<<<<")
     val android = project.extensions.findByType(AppExtension::class.java)
@@ -27,13 +29,24 @@ class ComponentizationPlugin: Plugin<Project> {
       registerTransform(ComponentScanner(this, config))
       project.afterEvaluate {
         project.dependencies.apply {
+          if (project.pluginManager.hasPlugin("kotlin-kapt")) {
+            add("kapt", annotationConfig)
+          } else {
+            add("annotationProcessor", annotationConfig)
+          }
           project.rootProject.subprojects {subProject ->
-            if (subProject.name != project.name &&
-                    matchProject(config.includeModules, subProject)) {
-              println("${project.name} implementation ${subProject.name}")
-              add("implementation", subProject)
-              config.addModuleDir(subProject.projectDir.absolutePath)
+            if (subProject.name == project.name ||
+                    !matchProject(config.includeModules, subProject)) {
+              return@subprojects
             }
+            println("${project.name} implementation ${subProject.name}")
+            add("implementation", subProject)
+            if (subProject.pluginManager.hasPlugin("kotlin-kapt")) {
+              subProject.dependencies.add("kapt", annotationConfig)
+            } else {
+              subProject.dependencies.add("annotationProcessor", annotationConfig)
+            }
+            config.addModuleDir(subProject.projectDir.absolutePath)
           }
         }
       }

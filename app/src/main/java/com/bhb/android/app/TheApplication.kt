@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.widget.Toast
 import com.bhb.android.componentization.AutoWired
+import com.bhb.android.componentization.Provider
 import com.bhb.android.componentization.Service
 
 @Service
@@ -14,12 +15,13 @@ class TheApplication: Application(), ContextAPI {
 
   companion object {
 
-    private lateinit var INSTANCE: TheApplication
+    @Provider
+    private lateinit var aaa: TheApplication
 
   }
 
   init {
-    INSTANCE = this
+    aaa = this
   }
 
   override fun getApplication(): Application {

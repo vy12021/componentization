@@ -26,14 +26,14 @@ buildscript {
   }
   dependencies {
     classpath 'com.android.tools.build:gradle:4.1.1'
-    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.10"
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.21"
     classpath 'com.bhb.android.plugin:componentization:0.4.6'
   }
 }
 
 ext {
 
-  minSdkVersion = 21
+  minSdkVersion = 19
   targetSdkVersion = 28
   compileSdkVersion = 29
   buildToolsVersion = '29.0.3'
@@ -71,7 +71,7 @@ subprojects {
       api fileTree(dir: "${project.projectDir}/libs", include: ['*.jar'])
       implementation 'androidx.appcompat:appcompat:1.2.0'
       implementation 'androidx.annotation:annotation:1.1.0'
-      testImplementation 'junit:junit:4.13'
+      testImplementation 'junit:junit:4.13.1'
       androidTestImplementation 'androidx.test.ext:junit:1.1.2'
       androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     }

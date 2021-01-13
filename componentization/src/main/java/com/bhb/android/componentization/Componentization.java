@@ -4,6 +4,8 @@ import android.util.Log;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,7 +16,7 @@ import java.util.Map;
 public final class Componentization {
 
   /**
-   * log tag
+   * Log tag
    */
   private static final String TAG = "Componentization";
 
@@ -56,11 +58,11 @@ public final class Componentization {
    */
   private static void register(Class<? extends ComponentRegister> register) {
     try {
-      Log.e(TAG, "register: " + register);
       ComponentRegister.Item registerItem = register.newInstance().register();
       for (Class<? extends API> api : registerItem.apis) {
         sComponentProvider.put(api, registerItem.service);
       }
+      Log.e(TAG, "register: " + registerItem.service.getName());
     } catch (Exception e) {
       e.printStackTrace();
       Log.e(TAG, Log.getStackTraceString(e));
@@ -155,7 +157,8 @@ public final class Componentization {
   }
 
   @SuppressWarnings("unchecked")
-  private static <T extends API> T makeInstance(Class<T> service, boolean singleton) {
+  private static <T extends API> T makeInstance(Class<T> service, boolean singleton)
+          throws ComponentException {
     T serviceInstance = null;
     try {
       Field INSTANCE = service.getDeclaredField("INSTANCE");
@@ -163,12 +166,52 @@ public final class Componentization {
       serviceInstance = (T) INSTANCE.get(null);
     } catch (Exception e) {
       e.printStackTrace();
-    } finally {
-      if (!singleton && null == serviceInstance) {
-        serviceInstance = newInstance(service);
-      }
     }
-    return serviceInstance;
+    if (null != serviceInstance) {
+      return serviceInstance;
+    }
+    if (singleton) {
+      Field[] fields = service.getDeclaredFields();
+      for (Field field : fields) {
+        Provider provider = field.getAnnotation(Provider.class);
+        if (null == provider) {
+          continue;
+        }
+        if (!service.isAssignableFrom(field.getType())) {
+          throw new ComponentException("对于Service类" + service.getName()
+                  + "而言，被@Provider标记为服务提供者属性\"" + field.getName() + "\"类型不兼容");
+        }
+        field.setAccessible(true);
+        try {
+          serviceInstance = (T) field.get(null);
+        } catch (IllegalAccessException e) {
+          e.printStackTrace();
+        }
+      }
+      Method[] methods = service.getMethods();
+      for (Method method : methods) {
+        Provider provider = method.getAnnotation(Provider.class);
+        if (null == provider) {
+          continue;
+        }
+        if (method.getParameterTypes().length > 0) {
+          throw new ComponentException("对于Service类" + service.getName()
+                  + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"不能有参数");
+        }
+        if (method.getReturnType() == null || !service.isAssignableFrom(method.getReturnType())) {
+          throw new ComponentException("对于Service类" + service.getName()
+                  + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"返回类型不兼容");
+        }
+        method.setAccessible(true);
+        try {
+          serviceInstance = (T) method.invoke(null);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+          e.printStackTrace();
+        }
+      }
+      return serviceInstance;
+    }
+    return newInstance(service);
   }
 
   @SuppressWarnings("unchecked")
