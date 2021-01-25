@@ -13,7 +13,7 @@ componentization {
 
 
 dependencies {
-  implementation project(':componentization')
+  /*implementation project(':componentization')
   annotationProcessor project(':compiler')
-  kapt project(':compiler')
+  kapt project(':compiler')*/
 }

@@ -122,9 +122,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
 
   private Set<Class<? extends Annotation>> getSupportedAnnotations() {
     Set<Class<? extends Annotation>> annotations = new LinkedHashSet<>();
-    // annotations.add(Api.class);
     annotations.add(Service.class);
-    // annotations.add(AutoWired.class);
     return annotations;
   }
 

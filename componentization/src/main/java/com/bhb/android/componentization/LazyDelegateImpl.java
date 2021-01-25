@@ -25,7 +25,7 @@ abstract class LazyDelegateImpl<C extends API> implements LazyDelegate<C> {
   }
 
   @Override
-  public C get() {
+  public synchronized C get() {
     if (null == api) {
       api = create();
     }

@@ -100,7 +100,8 @@ public final class Componentization {
     }
     Class<T> service = (Class<T>) sComponentProvider.get(type);
     if (null == service) {
-      throw new ComponentException("组件[" + type.getCanonicalName() + "]没有找到，清查找是否有实现");
+      throw new ComponentException(
+              "组件[" + type.getCanonicalName() + "]没有找到，确认是否有Service实现");
     }
     if (apiAnnotation.singleton()) {
       T serviceInstance = (T) sComponents.get(type);
@@ -159,63 +160,64 @@ public final class Componentization {
   @SuppressWarnings("unchecked")
   private static <T extends API> T makeInstance(Class<T> service, boolean singleton)
           throws ComponentException {
-    T serviceInstance = null;
     try {
+      // kotlin object class
       Field INSTANCE = service.getDeclaredField("INSTANCE");
       INSTANCE.setAccessible(true);
-      serviceInstance = (T) INSTANCE.get(null);
+      return (T) INSTANCE.get(null);
     } catch (Exception e) {
       e.printStackTrace();
     }
-    if (null != serviceInstance) {
-      return serviceInstance;
+
+    if (!singleton) {
+      return newInstance(service);
     }
-    if (singleton) {
-      Field[] fields = service.getDeclaredFields();
-      for (Field field : fields) {
-        Provider provider = field.getAnnotation(Provider.class);
-        if (null == provider) {
-          continue;
-        }
-        if (!service.isAssignableFrom(field.getType())) {
-          throw new ComponentException("对于Service类" + service.getName()
-                  + "而言，被@Provider标记为服务提供者属性\"" + field.getName() + "\"类型不兼容");
-        }
-        field.setAccessible(true);
-        try {
-          serviceInstance = (T) field.get(null);
-        } catch (IllegalAccessException e) {
-          e.printStackTrace();
-        }
+
+    // for singleton
+    Field[] fields = service.getDeclaredFields();
+    for (Field field : fields) {
+      Provider provider = field.getAnnotation(Provider.class);
+      if (null == provider) {
+        continue;
       }
-      Method[] methods = service.getMethods();
-      for (Method method : methods) {
-        Provider provider = method.getAnnotation(Provider.class);
-        if (null == provider) {
-          continue;
-        }
-        if (method.getParameterTypes().length > 0) {
-          throw new ComponentException("对于Service类" + service.getName()
-                  + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"不能有参数");
-        }
-        if (method.getReturnType() == null || !service.isAssignableFrom(method.getReturnType())) {
-          throw new ComponentException("对于Service类" + service.getName()
-                  + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"返回类型不兼容");
-        }
-        method.setAccessible(true);
-        try {
-          serviceInstance = (T) method.invoke(null);
-        } catch (IllegalAccessException | InvocationTargetException e) {
-          e.printStackTrace();
-        }
+      if (!service.isAssignableFrom(field.getType())) {
+        throw new ComponentException("对于Service类" + service.getName()
+                + "而言，被@Provider标记为服务提供者属性\"" + field.getName() + "\"类型不兼容");
       }
-      return serviceInstance;
+      field.setAccessible(true);
+      try {
+        return (T) field.get(null);
+      } catch (IllegalAccessException e) {
+        e.printStackTrace();
+      }
     }
-    return newInstance(service);
+    Method[] methods = service.getMethods();
+    for (Method method : methods) {
+      Provider provider = method.getAnnotation(Provider.class);
+      if (null == provider) {
+        continue;
+      }
+      if (method.getParameterTypes().length > 0) {
+        throw new ComponentException("对于Service类" + service.getName()
+                + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"不能有参数");
+      }
+      if (method.getReturnType() == null || !service.isAssignableFrom(method.getReturnType())) {
+        throw new ComponentException("对于Service类" + service.getName()
+                + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"返回类型不兼容");
+      }
+      method.setAccessible(true);
+      try {
+        return (T) method.invoke(null);
+      } catch (IllegalAccessException | InvocationTargetException e) {
+        e.printStackTrace();
+      }
+    }
+    throw new ComponentException(
+            "对于Service类" + service.getName() + "而言，没有找到合适的实例提供者");
   }
 
   @SuppressWarnings("unchecked")
-  private static <T extends API> T newInstance(Class<T> service) {
+  private static <T extends API> T newInstance(Class<T> service) throws ComponentException {
     try {
       Constructor<? extends API> constructor = service.getDeclaredConstructor();
       constructor.setAccessible(true);
@@ -223,7 +225,7 @@ public final class Componentization {
     } catch (Exception e) {
       e.printStackTrace();
     }
-    return null;
+    throw new ComponentException("对于Service类" + service.getName() + "而言，没有找到合适的实例构造器");
   }
 
   @SuppressWarnings("unchecked")

@@ -2,7 +2,8 @@
 
 buildscript {
   ext {
-    kotlin_version = '1.4.10'
+    android_version = '4.1.2'
+    kotlin_version = '1.4.21'
   }
   repositories {
     google()
@@ -25,9 +26,9 @@ buildscript {
     }
   }
   dependencies {
-    classpath 'com.android.tools.build:gradle:4.1.1'
-    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.4.21"
-    classpath 'com.bhb.android.plugin:componentization:0.4.6'
+    classpath "com.android.tools.build:gradle:${android_version}"
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
+    classpath 'com.bhb.android.plugin:componentization:0.4.7.11'
   }
 }
 
@@ -47,13 +48,26 @@ ext {
 
 }
 
-subprojects {
-
+allprojects {
   repositories {
     google()
     jcenter()
     mavenCentral()
+    maven {
+      name "android"
+      url "https://nexus.bhbcode.com/repository/android/"
+      credentials {
+        username mavenUsername
+        password mavenPassword
+      }
+      authentication {
+        basic(BasicAuthentication)
+      }
+    }
   }
+}
+
+subprojects {
 
   afterEvaluate {
     def plugins = getPlugins()
