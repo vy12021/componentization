@@ -86,13 +86,12 @@ class MyApplication: Application(), ApplicationAPI {
 
   // 注意单例实现
   companion object {
-
-    private lateinit var INSTANCE: MyApplication
-
+    @Provider
+    private lateinit var singleton: MyApplication
   }
 
   init {
-    INSTANCE = this
+    singleton = this
   }
 
   override fun getContext(): Application {
