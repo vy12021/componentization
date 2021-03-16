@@ -3,16 +3,9 @@
 buildscript {
   ext {
     android_version = '4.1.2'
-    kotlin_version = '1.4.21'
+    kotlin_version = '1.4.31'
   }
   repositories {
-    google()
-    jcenter()
-    mavenCentral()
-    gradlePluginPortal()
-    maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
-    maven { url 'http://maven.aliyun.com/nexus/content/repositories/jcenter' }
-    maven { url 'https://maven.aliyun.com/repository/google' }
     maven {
       name "plugin"
       url "https://nexus.bhbcode.com/repository/android-plugin/"
@@ -24,11 +17,17 @@ buildscript {
         basic(BasicAuthentication)
       }
     }
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+    maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    maven { url 'http://maven.aliyun.com/nexus/content/repositories/jcenter' }
+    maven { url 'https://maven.aliyun.com/repository/google' }
   }
   dependencies {
     classpath "com.android.tools.build:gradle:${android_version}"
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
-    classpath 'com.bhb.android.plugin:componentization:0.4.7.11'
+    classpath 'com.bhb.android.plugin:componentization:0.4.8'
   }
 }
 
@@ -50,9 +49,6 @@ ext {
 
 allprojects {
   repositories {
-    google()
-    jcenter()
-    mavenCentral()
     maven {
       name "android"
       url "https://nexus.bhbcode.com/repository/android/"
@@ -64,6 +60,11 @@ allprojects {
         basic(BasicAuthentication)
       }
     }
+    google()
+    mavenCentral()
+    maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    maven { url 'http://maven.aliyun.com/nexus/content/repositories/jcenter' }
+    maven { url 'https://maven.aliyun.com/repository/google' }
   }
 }
 
@@ -85,7 +86,7 @@ subprojects {
       api fileTree(dir: "${project.projectDir}/libs", include: ['*.jar'])
       implementation 'androidx.appcompat:appcompat:1.2.0'
       implementation 'androidx.annotation:annotation:1.1.0'
-      testImplementation 'junit:junit:4.13.1'
+      testImplementation 'junit:junit:4.13.2'
       androidTestImplementation 'androidx.test.ext:junit:1.1.2'
       androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     }

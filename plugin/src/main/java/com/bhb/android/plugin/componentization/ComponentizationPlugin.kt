@@ -3,6 +3,7 @@ package com.bhb.android.plugin.componentization
 import com.android.build.gradle.AppExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import java.util.*
 
 /**
  * 组件收集和自动化注入插件
@@ -12,8 +13,20 @@ class ComponentizationPlugin: Plugin<Project> {
 
   private lateinit var config: ComponentizationConfig
 
-  private val annotationConfig = "com.bhb.android.componentization:compiler:0.4.7.11"
-  private val runtimeConfig = "com.bhb.android.componentization:componentization:0.4.7.11"
+  private val properties by lazy {
+    Properties().apply {
+      Thread.currentThread().contextClassLoader.getResourceAsStream("artifact.properties")?.run {
+        load(this)
+      }
+    }
+  }
+
+  private val Group by lazy { properties.getProperty("implementation-group", "") }
+
+  private val Version by lazy { properties.getProperty("implementation-version", "") }
+
+  private val annotationConfig = "${Group}:compiler:${Version}"
+  private val runtimeConfig = "${Group}:componentization:${Version}"
 
   override fun apply(project: Project) {
     println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin<<<<<<<<<<<<<<<<<<<<<<")
@@ -27,8 +40,9 @@ class ComponentizationPlugin: Plugin<Project> {
     // 不能在此处使用扩展配置，需要至少在下一条任务中才能使用，此处扩展属性dsl并没有读取和装载
     android?.apply {
       registerTransform(ComponentScanner(this, config))
+      // fixme 如果在主项目的afterEvaluate中注入依赖会导致注解处理器失效？？？
+      injectDependency(project)
       project.afterEvaluate {_ ->
-        injectDependency(project)
         project.rootProject.subprojects {subProject ->
           if (subProject.name == project.name ||
                   !matchProject(config.includeModules, subProject)) {
@@ -47,6 +61,7 @@ class ComponentizationPlugin: Plugin<Project> {
 
   private fun injectDependency(project: Project) {
     project.dependencies.add("implementation", runtimeConfig)
+    println("injectDependency: ${project.name}---> implementation $runtimeConfig")
     if (project.pluginManager.hasPlugin("kotlin-kapt")) {
       project.dependencies.add("kapt", annotationConfig)
       println("injectDependency: ${project.name}---> kapt $annotationConfig")

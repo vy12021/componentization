@@ -13,7 +13,6 @@ componentization {
 
 
 dependencies {
-  /*implementation project(':componentization')
-  annotationProcessor project(':compiler')
-  kapt project(':compiler')*/
+  /*kapt 'com.bhb.android.componentization:compiler:0.4.7.17'
+  annotationProcessor 'com.bhb.android.componentization:compiler:0.4.7.17'*/
 }

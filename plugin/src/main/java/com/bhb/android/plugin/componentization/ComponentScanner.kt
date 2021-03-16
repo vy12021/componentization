@@ -120,7 +120,7 @@ class ComponentScanner(androidExt: AppExtension,
    * android sdk所在路径
    */
   private val androidJar by lazy {
-    androidExt.sdkDirectory.absolutePath + "/platforms/${androidExt.compileSdkVersion}/android.jar"
+    "${androidExt.sdkDirectory.absolutePath}/platforms/${androidExt.compileSdkVersion}/android.jar"
   }
 
   /**
@@ -128,6 +128,9 @@ class ComponentScanner(androidExt: AppExtension,
    */
   private val DEBUG by lazy { config.debugMode }
 
+  /**
+   * 注册缓存
+   */
   private val registers = mutableSetOf<CtClass>()
 
   private lateinit var outputProvider: TransformOutputProvider
@@ -147,7 +150,7 @@ class ComponentScanner(androidExt: AppExtension,
           QualifiedContent.Scope.PROJECT,
   )
 
-  override fun isIncremental() = true
+  override fun isIncremental() = config.incremental
 
   override fun transform(transformInvocation: TransformInvocation) {
     println(">>>>>>>>>>>>>>>>>>>>>>启动扫描并注册和注入组件任务<<<<<<<<<<<<<<<<<<<<<<<")
@@ -157,7 +160,9 @@ class ComponentScanner(androidExt: AppExtension,
     allInputs = transformInvocation.inputs
     outputProvider = transformInvocation.outputProvider.apply {
       // 清理所有缓存文件
-      deleteAll()
+      if (!isIncremental) {
+        deleteAll()
+      }
     }
     val classPool = ClassPool(false)
     val classPaths = mutableListOf<ClassPath>()

@@ -21,6 +21,10 @@ public class ComponentizationConfig {
    */
   boolean debugMode = false;
   /**
+   * 是否增量模式
+   */
+  boolean incremental = false;
+  /**
    * 支持的导入module名称(正则)
    */
   String[] includeModules = new String[0];
@@ -81,6 +85,14 @@ public class ComponentizationConfig {
     this.debugMode = debugMode;
   }
 
+  public boolean isIncremental() {
+    return incremental;
+  }
+
+  public void setIncremental(boolean incremental) {
+    this.incremental = incremental;
+  }
+
   void addModuleDir(String... modules) {
     this.modulesDir.addAll(Arrays.asList(modules));
   }
@@ -89,6 +101,7 @@ public class ComponentizationConfig {
   public String toString() {
     return "ComponentizationConfig{" +
             "debugMode=" + debugMode +
+            ", incremental=" + incremental +
             ", includeModules=" + Arrays.toString(includeModules) +
             ", includeJars=" + Arrays.toString(includeJars) +
             ", includePackages=" + Arrays.toString(includePackages) +

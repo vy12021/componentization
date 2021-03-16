@@ -2,7 +2,6 @@ package com.bhb.android.componentization;
 
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
-import com.google.common.collect.ImmutableSet;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -29,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -53,8 +53,8 @@ import javax.tools.Diagnostic;
  * Created by Tesla on 2020/09/30.
  */
 @AutoService(Processor.class)
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 @IncrementalAnnotationProcessor(IncrementalAnnotationProcessorType.DYNAMIC)
+@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public final class ComponentizationProcessor extends AbstractProcessor {
 
   private static final String PACKAGE_SPACE = "com.bhb.android.componentization";
@@ -79,10 +79,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private Filer filer;
   private @Nullable Trees trees;
   private Messager logger;
+  private Map<String, String> options;
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
     super.init(env);
+    options = env.getOptions();
     typeUtils = env.getTypeUtils();
     logger = env.getMessager();
     filer = env.getFiler();
@@ -104,12 +106,16 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     }
   }
 
+  @Override public SourceVersion getSupportedSourceVersion() {
+    return SourceVersion.RELEASE_8;
+  }
+
   @Override public Set<String> getSupportedOptions() {
-    ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+    Set<String> options = new LinkedHashSet<>(1);
     if (trees != null) {
-      builder.add(IncrementalAnnotationProcessorType.ISOLATING.getProcessorOption());
+      options.add(IncrementalAnnotationProcessorType.ISOLATING.getProcessorOption());
     }
-    return builder.build();
+    return options;
   }
 
   @Override public Set<String> getSupportedAnnotationTypes() {
@@ -130,6 +136,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
     for (Element element : env.getElementsAnnotatedWith(Service.class)) {
       if (!SuperficialValidation.validateElement(element)) {
+        logger.printMessage(Diagnostic.Kind.WARNING, "不合法元素：" + element.getSimpleName().toString());
         continue;
       }
       try {

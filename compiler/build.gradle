@@ -7,11 +7,10 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 dependencies {
   implementation project(':annotation')
+  implementation 'com.squareup:javapoet:1.13.0'
   implementation 'com.google.auto:auto-common:0.10'
-  implementation 'com.google.guava:guava:28.1-jre'
-  implementation 'com.squareup:javapoet:1.12.1'
-  compileOnly 'com.google.auto.service:auto-service:1.0-rc4'
-  annotationProcessor 'com.google.auto.service:auto-service:1.0-rc4'
+  compileOnly 'com.google.auto.service:auto-service:1.0-rc7'
+  annotationProcessor 'com.google.auto.service:auto-service:1.0-rc7'
   compileOnly files(Jvm.current().getToolsJar())
 
   implementation 'net.ltgt.gradle.incap:incap:0.2'
