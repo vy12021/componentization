@@ -1,9 +1,10 @@
-import org.gradle.internal.jvm.Jvm
-
 apply plugin: 'java-library'
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
+java {
+  sourceCompatibility = JavaVersion.VERSION_1_8
+  targetCompatibility = JavaVersion.VERSION_1_8
+}
+
 
 dependencies {
   implementation project(':annotation')

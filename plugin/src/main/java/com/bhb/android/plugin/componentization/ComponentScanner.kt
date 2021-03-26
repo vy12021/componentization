@@ -160,7 +160,7 @@ class ComponentScanner(androidExt: AppExtension,
     allInputs = transformInvocation.inputs
     outputProvider = transformInvocation.outputProvider.apply {
       // 清理所有缓存文件
-      if (!isIncremental) {
+      if (!transformInvocation.isIncremental) {
         deleteAll()
       }
     }
@@ -397,11 +397,11 @@ class ComponentScanner(androidExt: AppExtension,
   /**
    * 重新打jar
    * @param jarInput  输入的jar包
-   * @param transformClassed jar包中被转换过的class
+   * @param transformedClasses jar包中被转换过的class
    */
   private fun repackageJar(classPool: ClassPool,
                            jarInput: JarInput, jarOutput: File,
-                           transformClassed: List<CtClass>) {
+                           transformedClasses: List<CtClass>) {
     println("repackageJar: \n${jarInput.file.absolutePath} \n--> ${jarOutput.absolutePath}")
     JarFile(jarInput.file).use {jarFile ->
       JarOutputStream(jarOutput.outputStream()).use {jarOs ->
@@ -409,7 +409,7 @@ class ComponentScanner(androidExt: AppExtension,
           jarFile.getInputStream(entry).use {entryIs ->
             val zipEntry = ZipEntry(entry.name)
             val clazz = getCtClassFromClassEntry(classPool, entry.name)
-            if (transformClassed.contains(clazz)) {
+            if (transformedClasses.contains(clazz)) {
               println("\twrite class: ${clazz.name} -> ${jarOutput.absolutePath}")
               jarOs.putNextEntry(zipEntry)
               jarOs.write(clazz.toBytecode())
