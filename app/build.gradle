@@ -5,7 +5,7 @@ apply plugin: 'componentization'
 
 componentization {
   debugMode = true
-  includeModules = ['app', '^libra.*']
+  includeModules = ['app', '^libra.*', '^viewpager.*']
   includeJars = ['clase']
   includePackages = ['com.bhb.android']
   excludePackages = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
@@ -13,6 +13,4 @@ componentization {
 
 
 dependencies {
-  /*kapt 'com.bhb.android.componentization:compiler:0.4.7.17'
-  annotationProcessor 'com.bhb.android.componentization:compiler:0.4.7.17'*/
 }

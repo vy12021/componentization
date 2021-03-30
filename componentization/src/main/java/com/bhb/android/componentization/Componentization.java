@@ -4,8 +4,10 @@ import android.util.Log;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,6 +36,10 @@ public final class Componentization {
    * 单例组件存储
    */
   private final static Map<Class<? extends API>, API> sComponents = new HashMap<>();
+  /**
+   * 默认api代理空调用实现
+   */
+  private final static InvocationHandler sDynamicHandler = (proxy, method, args) -> null;
 
   /**
    * 手动注册
@@ -100,6 +106,10 @@ public final class Componentization {
     }
     Class<T> service = (Class<T>) sComponentProvider.get(type);
     if (null == service) {
+      if (apiAnnotation.dynamic()) {
+        return (T) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
+                new Class[]{type}, sDynamicHandler);
+      }
       throw new ComponentException(
               "组件[" + type.getCanonicalName() + "]没有找到，确认是否有Service实现");
     }

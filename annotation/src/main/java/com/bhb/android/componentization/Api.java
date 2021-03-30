@@ -18,4 +18,9 @@ public @interface Api {
    */
   boolean singleton() default false;
 
+  /**
+   * 是否动态模式，表达api接口是否必须有实现，如果没有实现代理一个默认的
+   */
+  boolean dynamic() default false;
+
 }

@@ -58,6 +58,7 @@ class ComponentScanner(androidExt: AppExtension,
     mutableListOf<String>().apply {
       add("classes")
       add(".*-componentization-.*")
+      addAll(config.includeModules.toList())
       addAll(config.includeJars.toList())
     }
   }
@@ -86,12 +87,10 @@ class ComponentScanner(androidExt: AppExtension,
     if (jarFile.extension != "jar") {
       return false
     }
-    if (null == config.modulesDir.find { jarFile.absolutePath.startsWith(it) }) {
-      return false
-    }
+    val jarName = jarFile.nameWithoutExtension
     val findJar = fun (includes: List<String>): String? {
       return includes.find {
-        jarFile.nameWithoutExtension == it || jarFile.nameWithoutExtension.matches(it.toRegex())
+        jarName == it || jarName.matches(it.toRegex())
       }
     }
     findJar(includeJars)?.let {
@@ -100,7 +99,7 @@ class ComponentScanner(androidExt: AppExtension,
     if (config.includeJars.isNotEmpty()) {
       return false
     }
-    return findJar(excludeJars) == null
+    return false/*findJar(excludeJars) == null*/
   }
 
   /**
@@ -129,7 +128,7 @@ class ComponentScanner(androidExt: AppExtension,
   private val DEBUG by lazy { config.debugMode }
 
   /**
-   * 注册缓存
+   * 注册类收集
    */
   private val registers = mutableSetOf<CtClass>()
 
