@@ -41,7 +41,7 @@ class ComponentizationPlugin: Plugin<Project> {
     android?.apply {
       registerTransform(ComponentScanner(this, config))
       // fixme 如果在主项目的afterEvaluate中注入依赖会导致注解处理器失效？？？
-      injectDependency(project)
+      // injectDependency(project)
       project.afterEvaluate {_ ->
         project.rootProject.subprojects {subProject ->
           if (subProject.name == project.name ||
@@ -51,7 +51,7 @@ class ComponentizationPlugin: Plugin<Project> {
           println("${project.name} implementation ${subProject.name}")
           project.dependencies.add("implementation", subProject)
           subProject.afterEvaluate {
-            injectDependency(it)
+            // injectDependency(it)
           }
           config.addModuleDir(subProject.projectDir.absolutePath)
         }

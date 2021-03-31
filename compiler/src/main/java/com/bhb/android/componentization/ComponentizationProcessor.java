@@ -17,6 +17,7 @@ import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.processing.JavacFiler;
 
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType;
@@ -206,14 +207,16 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     }
     Properties properties = new Properties();
     FileObject filerResource = filer.createResource(StandardLocation.CLASS_OUTPUT,
-            null, "module-register.properties");
-    try (InputStream is = filerResource.openInputStream()) {
+            "", moduleName + "-register.properties");
+    String path = filerResource.getName();
+    logger.printMessage(Diagnostic.Kind.WARNING, "FileObject.getName()=" + path);
+    /*try (InputStream is = filerResource.openInputStream()) {
       properties.load(is);
-    }
-    properties.put(moduleName, classesBuilder.toString());
+    }*/
+    /*properties.put(moduleName, classesBuilder.toString());
     try (Writer writer = filerResource.openWriter()) {
       properties.store(writer, "module registers");
-    }
+    }*/
   }
 
   private AnnotationSpec buildRegisterMeta(Element element) {

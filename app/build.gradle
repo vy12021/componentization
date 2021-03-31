@@ -11,6 +11,22 @@ componentization {
   excludePackages = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
 }
 
+android {
+  defaultConfig {
+
+    javaCompileOptions {
+      annotationProcessorOptions {
+        arguments += [
+            "module-name": project.name,
+        ]
+      }
+    }
+
+  }
+}
+
 
 dependencies {
+  annotationProcessor project(':compiler')
+  kapt project(':compiler')
 }
