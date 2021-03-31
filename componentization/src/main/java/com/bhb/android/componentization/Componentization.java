@@ -2,14 +2,20 @@ package com.bhb.android.componentization;
 
 import android.util.Log;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
 /**
  * 组件入口调用
@@ -253,6 +259,45 @@ public final class Componentization {
       }
     }
     return clazz;
+  }
+
+  static {
+    try {
+      for (Class<? extends ComponentRegister> registerClazz : loadModuleRegisters()) {
+        register(registerClazz);
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  /**
+   * 从注解处理器生成的组件注册属性文件中反射载入注册类
+   * @return 返回
+   */
+  private static Set<Class<? extends ComponentRegister>> loadModuleRegisters()
+          throws ComponentException {
+    InputStream propertyStream = Thread.currentThread().getContextClassLoader()
+            .getResourceAsStream("module-register.properties");
+    if (null == propertyStream) {
+      return Collections.emptySet();
+    }
+    Properties properties = new Properties();
+    try {
+      properties.load(propertyStream);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return Collections.emptySet();
+    }
+    Set<Class<? extends ComponentRegister>> registers = new HashSet<>();
+    for (Object key : properties.keySet()) {
+      String module = key.toString();
+      String classes = properties.getProperty(module);
+      for (String clazzName : classes.split(",\\n*")) {
+        registers.add(loadClass(clazzName));
+      }
+    }
+    return registers;
   }
 
 }

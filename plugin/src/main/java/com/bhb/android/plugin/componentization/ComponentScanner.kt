@@ -58,7 +58,9 @@ class ComponentScanner(androidExt: AppExtension,
     mutableListOf<String>().apply {
       add("classes")
       add(".*-componentization-.*")
-      addAll(config.includeModules.toList())
+      if (!config.incremental) {
+        addAll(config.includeModules.toList())
+      }
       addAll(config.includeJars.toList())
     }
   }
@@ -177,9 +179,11 @@ class ComponentScanner(androidExt: AppExtension,
     // 验证注册信息正确性
     checkRegisterValid(classPool)
     // 注入自动化注册逻辑，并重新打包
-    componentizationJarInput.apply {
-      repackageJar(classPool, this, getOutput(this),
-              listOf(transformComponentizationJar(classPool, this)))
+    if (!config.incremental) {
+      componentizationJarInput.apply {
+        repackageJar(classPool, this, getOutput(this),
+                listOf(transformComponentizationJar(classPool, this)))
+      }
     }
     // 释放类资源
     freeClassPoll(classPool, classPaths)
@@ -187,8 +191,8 @@ class ComponentScanner(androidExt: AppExtension,
             "${(System.currentTimeMillis() - startTime) / 1000f}秒<<<<<<<<<<<<<<<<<")
   }
 
-  private fun getOutput(content: QualifiedContent)
-  = outputProvider.getContentLocation(content.name, content.contentTypes, content.scopes,
+  private fun getOutput(content: QualifiedContent) =
+          outputProvider.getContentLocation(content.name, content.contentTypes, content.scopes,
           if (content is JarInput) Format.JAR else Format.DIRECTORY)
 
   /**

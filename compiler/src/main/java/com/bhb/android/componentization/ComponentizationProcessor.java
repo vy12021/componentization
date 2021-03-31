@@ -22,13 +22,17 @@ import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -47,6 +51,8 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import javax.tools.FileObject;
+import javax.tools.StandardLocation;
 
 /**
  * 组件相关注解处理
@@ -75,11 +81,18 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private static final ClassName AnnotationMetaType = ClassName.get(
           PACKAGE_SPACE, "Meta");
 
+  /**
+   * 模块名注解处理器选项，值为String表达当前模块名称
+   */
+  private static final String OPTION_MODULE_NAME = "module-name";
+
   private Types typeUtils;
   private Filer filer;
   private @Nullable Trees trees;
   private Messager logger;
   private Map<String, String> options;
+  private Set<String> registers = new HashSet<>();
+  private String moduleName;
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
@@ -88,6 +101,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     typeUtils = env.getTypeUtils();
     logger = env.getMessager();
     filer = env.getFiler();
+    moduleName = options.get(OPTION_MODULE_NAME);
     try {
       trees = Trees.instance(processingEnv);
     } catch (IllegalArgumentException ignored) {
@@ -113,6 +127,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   @Override public Set<String> getSupportedOptions() {
     Set<String> options = new LinkedHashSet<>(1);
     if (trees != null) {
+      options.add("module-name");
       options.add(IncrementalAnnotationProcessorType.ISOLATING.getProcessorOption());
     }
     return options;
@@ -136,7 +151,8 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment env) {
     for (Element element : env.getElementsAnnotatedWith(Service.class)) {
       if (!SuperficialValidation.validateElement(element)) {
-        logger.printMessage(Diagnostic.Kind.WARNING, "不合法元素：" + element.getSimpleName().toString());
+        logger.printMessage(Diagnostic.Kind.WARNING,
+                "不合法元素：" + element.getSimpleName().toString());
         continue;
       }
       try {
@@ -147,6 +163,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
         logger.printMessage(Diagnostic.Kind.ERROR, e.getMessage());
         return false;
       }
+    }
+    try {
+      generateRegisterProperty();
+    } catch (Exception e) {
+      e.printStackTrace();
+      logger.printMessage(Diagnostic.Kind.ERROR, e.getMessage());
     }
     return false;
   }
@@ -166,6 +188,32 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     JavaFile file = JavaFile.builder(PACKAGE_SPACE, typeBuilder.build())
             .addFileComment("此文件为自动生成，用于组件化辅助注册").build();
     file.writeTo(filer);
+    registers.add(file.packageName + "." + file.typeSpec.name);
+  }
+
+  /**
+   * 生成模块注册类相关属性缓存，用做增量编译
+   */
+  private void generateRegisterProperty() throws Exception {
+    StringBuilder classesBuilder = new StringBuilder();
+    Iterator<String> iterator = registers.iterator();
+    while (iterator.hasNext()) {
+      String register = iterator.next();
+      classesBuilder.append(register);
+      if (iterator.hasNext()) {
+        classesBuilder.append(",");
+      }
+    }
+    Properties properties = new Properties();
+    FileObject filerResource = filer.createResource(StandardLocation.CLASS_OUTPUT,
+            null, "module-register.properties");
+    try (InputStream is = filerResource.openInputStream()) {
+      properties.load(is);
+    }
+    properties.put(moduleName, classesBuilder.toString());
+    try (Writer writer = filerResource.openWriter()) {
+      properties.store(writer, "module registers");
+    }
   }
 
   private AnnotationSpec buildRegisterMeta(Element element) {
