@@ -101,7 +101,7 @@ class ComponentScanner(androidExt: AppExtension,
     if (config.includeJars.isNotEmpty()) {
       return false
     }
-    return false/*findJar(excludeJars) == null*/
+    return false
   }
 
   /**
@@ -151,7 +151,7 @@ class ComponentScanner(androidExt: AppExtension,
           QualifiedContent.Scope.PROJECT,
   )
 
-  override fun isIncremental() = config.incremental
+  override fun isIncremental() = false
 
   override fun transform(transformInvocation: TransformInvocation) {
     println(">>>>>>>>>>>>>>>>>>>>>>启动扫描并注册和注入组件任务<<<<<<<<<<<<<<<<<<<<<<<")
@@ -179,8 +179,10 @@ class ComponentScanner(androidExt: AppExtension,
     // 验证注册信息正确性
     checkRegisterValid(classPool)
     // 注入自动化注册逻辑，并重新打包
-    if (!config.incremental) {
-      componentizationJarInput.apply {
+    componentizationJarInput.apply {
+      if (config.incremental) {
+        file.copyTo(getOutput(this))
+      } else {
         repackageJar(classPool, this, getOutput(this),
                 listOf(transformComponentizationJar(classPool, this)))
       }

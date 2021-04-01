@@ -27,7 +27,7 @@ buildscript {
   dependencies {
     classpath "com.android.tools.build:gradle:${android_version}"
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
-    classpath 'com.bhb.android.plugin:componentization:0.4.9.1'
+    classpath 'com.bhb.android.plugin:componentization:0.4.9.18'
   }
 }
 

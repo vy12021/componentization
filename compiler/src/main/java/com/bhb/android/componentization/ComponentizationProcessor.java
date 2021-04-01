@@ -17,13 +17,19 @@ import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
-import com.sun.tools.javac.processing.JavacFiler;
 
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType;
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -52,8 +58,6 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
-import javax.tools.FileObject;
-import javax.tools.StandardLocation;
 
 /**
  * 组件相关注解处理
@@ -85,7 +89,15 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   /**
    * 模块名注解处理器选项，值为String表达当前模块名称
    */
-  private static final String OPTION_MODULE_NAME = "module-name";
+  private static final String OPTION_MODULE_NAME = "option.module.name";
+  /**
+   * 项目根目录
+   */
+  private static final String OPTION_PLUGIN_DIR = "option.plugin.module.dir";
+  /**
+   * 资源目录，相对于模块目录
+   */
+  private static final String OPTION_RESOURCES_DIR = "option.resources.dir";
 
   private Types typeUtils;
   private Filer filer;
@@ -94,6 +106,8 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private Map<String, String> options;
   private Set<String> registers = new HashSet<>();
   private String moduleName;
+  private String appDirectory;
+  private String resourcesDirectory;
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
@@ -103,6 +117,8 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     logger = env.getMessager();
     filer = env.getFiler();
     moduleName = options.get(OPTION_MODULE_NAME);
+    appDirectory = options.get(OPTION_PLUGIN_DIR);
+    resourcesDirectory = options.get(OPTION_RESOURCES_DIR);
     try {
       trees = Trees.instance(processingEnv);
     } catch (IllegalArgumentException ignored) {
@@ -126,9 +142,11 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   }
 
   @Override public Set<String> getSupportedOptions() {
-    Set<String> options = new LinkedHashSet<>(1);
+    Set<String> options = new LinkedHashSet<>(4);
     if (trees != null) {
-      options.add("module-name");
+      options.add(OPTION_MODULE_NAME);
+      options.add(OPTION_PLUGIN_DIR);
+      options.add(OPTION_RESOURCES_DIR);
       options.add(IncrementalAnnotationProcessorType.ISOLATING.getProcessorOption());
     }
     return options;
@@ -195,7 +213,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   /**
    * 生成模块注册类相关属性缓存，用做增量编译
    */
-  private void generateRegisterProperty() throws Exception {
+  private synchronized void generateRegisterProperty() throws Exception {
     StringBuilder classesBuilder = new StringBuilder();
     Iterator<String> iterator = registers.iterator();
     while (iterator.hasNext()) {
@@ -206,17 +224,34 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       }
     }
     Properties properties = new Properties();
-    FileObject filerResource = filer.createResource(StandardLocation.CLASS_OUTPUT,
-            "", moduleName + "-register.properties");
-    String path = filerResource.getName();
-    logger.printMessage(Diagnostic.Kind.WARNING, "FileObject.getName()=" + path);
-    /*try (InputStream is = filerResource.openInputStream()) {
+    File propDir = new File(appDirectory, resourcesDirectory);
+    File propFile = new File(propDir, "module-register.properties");
+    if (!propDir.exists() && !propDir.mkdirs()) {
+      logger.printMessage(Diagnostic.Kind.ERROR, "创建资源文件夹失败: " + propDir + "\n ");
+      return;
+    }
+    if (!propFile.exists() && !propFile.createNewFile()) {
+      logger.printMessage(Diagnostic.Kind.ERROR, "创建注册清单文件失败: " + propFile + "\n ");
+      return;
+    }
+    // 锁文件生成到插件build目录
+    File lockFile = new File(new File(appDirectory, "build"), "module-register.lock");
+    while (lockFile.exists()) {
+      Thread.sleep(5);
+    }
+    lockFile.createNewFile();
+    logger.printMessage(Diagnostic.Kind.WARNING, "准备写入注册清单: " + propFile + "\n ");
+    try (InputStream is = new FileInputStream(propFile)) {
       properties.load(is);
-    }*/
-    /*properties.put(moduleName, classesBuilder.toString());
-    try (Writer writer = filerResource.openWriter()) {
-      properties.store(writer, "module registers");
-    }*/
+      logger.printMessage(Diagnostic.Kind.WARNING, "已有属性--->" + properties.keySet() + "\n ");
+      properties.put(moduleName, classesBuilder.toString());
+      logger.printMessage(Diagnostic.Kind.WARNING, "写入属性--->" + moduleName + ": " + classesBuilder.toString() + "\n ");
+      try (OutputStream writer = new FileOutputStream(propFile)) {
+        properties.store(writer, "module registers");
+      }
+    } finally {
+      lockFile.delete();
+    }
   }
 
   private AnnotationSpec buildRegisterMeta(Element element) {
@@ -493,6 +528,19 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private TypeName getRawType(TypeName typeName) {
     return typeName instanceof ParameterizedTypeName
             ? ((ParameterizedTypeName) typeName).rawType : typeName;
+  }
+
+  /**
+   * 尝试进行文件锁处理
+   */
+  private synchronized void lockWithFile(String fileName, Runnable closure) throws Exception {
+    File lockFile = new File(appDirectory, fileName);
+    while (lockFile.exists()) {
+      Thread.sleep(10);
+    }
+    lockFile.createNewFile();
+    closure.run();
+    lockFile.delete();
   }
 
 }

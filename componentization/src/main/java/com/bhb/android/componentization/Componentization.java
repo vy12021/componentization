@@ -113,6 +113,7 @@ public final class Componentization {
     Class<T> service = (Class<T>) sComponentProvider.get(type);
     if (null == service) {
       if (apiAnnotation.dynamic()) {
+        Log.w(TAG, "动态组件[" + type.getCanonicalName() + "]没有Service实现，暂时忽略");
         return (T) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
                 new Class[]{type}, sDynamicHandler);
       }
@@ -148,6 +149,14 @@ public final class Componentization {
     try {
       type = null != type.getAnnotation(Service.class)
               ? type : (Class<T>) sComponentProvider.get(type);
+      if (null == type) {
+        Api apiAnnotation = apiType.getAnnotation(Api.class);
+        if (apiAnnotation.dynamic()) {
+          Log.w(TAG, "动态组件[" + apiType.getCanonicalName() + "]没有Service实现，暂时忽略");
+          return (T) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
+                  new Class[]{apiType}, sDynamicHandler);
+        }
+      }
       Class<? extends LazyDelegate<T>> lazyClazz
               = loadClass(PACKAGE + "." + type.getSimpleName() + LazyDelegate.SUFFIX);
       return (T) lazyClazz.newInstance();
@@ -264,6 +273,7 @@ public final class Componentization {
   static {
     try {
       for (Class<? extends ComponentRegister> registerClazz : loadModuleRegisters()) {
+        Log.e(TAG, "register from: " + registerClazz.getName());
         register(registerClazz);
       }
     } catch (Exception e) {
@@ -277,9 +287,11 @@ public final class Componentization {
    */
   private static Set<Class<? extends ComponentRegister>> loadModuleRegisters()
           throws ComponentException {
+    Log.e(TAG, "loadModuleRegisters....");
     InputStream propertyStream = Thread.currentThread().getContextClassLoader()
             .getResourceAsStream("module-register.properties");
     if (null == propertyStream) {
+      Log.e(TAG, "loadModuleRegisters failed, properties file not found");
       return Collections.emptySet();
     }
     Properties properties = new Properties();
@@ -287,16 +299,20 @@ public final class Componentization {
       properties.load(propertyStream);
     } catch (IOException e) {
       e.printStackTrace();
+      Log.e(TAG, "loadModuleRegisters failed, properties file can't load: "
+              + e.getLocalizedMessage());
       return Collections.emptySet();
     }
     Set<Class<? extends ComponentRegister>> registers = new HashSet<>();
     for (Object key : properties.keySet()) {
       String module = key.toString();
+      Log.e(TAG, "loadModuleRegisters key: " + module);
       String classes = properties.getProperty(module);
       for (String clazzName : classes.split(",\\n*")) {
         registers.add(loadClass(clazzName));
       }
     }
+    Log.e(TAG, "loadModuleRegisters completed");
     return registers;
   }
 

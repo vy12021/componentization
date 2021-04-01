@@ -44,6 +44,10 @@ public class ComponentizationConfig {
    * 被导入的模块目录
    */
   List<String> modulesDir = new ArrayList<>();
+  /**
+   * 资源目录
+   */
+  String resourcesDir = "src/main/resources";
 
   public String[] getIncludeModules() {
     return includeModules;
@@ -93,6 +97,14 @@ public class ComponentizationConfig {
     this.incremental = incremental;
   }
 
+  public String getResourcesDir() {
+    return resourcesDir;
+  }
+
+  public void setResourcesDir(String resourcesDir) {
+    this.resourcesDir = resourcesDir;
+  }
+
   void addModuleDir(String... modules) {
     this.modulesDir.addAll(Arrays.asList(modules));
   }
@@ -102,6 +114,7 @@ public class ComponentizationConfig {
     return "ComponentizationConfig{" +
             "debugMode=" + debugMode +
             ", incremental=" + incremental +
+            ", resourcesDir=" + resourcesDir +
             ", includeModules=" + Arrays.toString(includeModules) +
             ", includeJars=" + Arrays.toString(includeJars) +
             ", includePackages=" + Arrays.toString(includePackages) +

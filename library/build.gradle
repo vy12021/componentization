@@ -18,7 +18,7 @@ android {
     javaCompileOptions {
       annotationProcessorOptions {
         arguments += [
-            "module-name": project.name,
+                "option.module.name": project.name
         ]
       }
     }
@@ -35,9 +35,9 @@ android {
 
 dependencies {
   implementation fileTree(dir: "libs", include: ["*.jar"])
-  api project(':componentization')
-  annotationProcessor project(':compiler')
-  kapt project(':compiler')
+//  api project(':componentization')
+//  annotationProcessor project(':compiler')
+//  kapt project(':compiler')
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   implementation 'androidx.core:core-ktx:1.3.2'
   implementation 'androidx.appcompat:appcompat:1.2.0'

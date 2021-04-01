@@ -5,6 +5,7 @@ apply plugin: 'componentization'
 
 componentization {
   debugMode = true
+  incremental = true
   includeModules = ['app', '^libra.*', '^viewpager.*']
   includeJars = ['clase']
   includePackages = ['com.bhb.android']
@@ -12,21 +13,18 @@ componentization {
 }
 
 android {
-  defaultConfig {
 
-    javaCompileOptions {
-      annotationProcessorOptions {
-        arguments += [
-            "module-name": project.name,
-        ]
-      }
+  sourceSets {
+    main {
+      jniLibs.
+      res
+      resources
     }
-
   }
+
 }
 
-
 dependencies {
-  annotationProcessor project(':compiler')
-  kapt project(':compiler')
+//  annotationProcessor project(':compiler')
+//  kapt project(':compiler')
 }
