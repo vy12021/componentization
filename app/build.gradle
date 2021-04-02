@@ -6,6 +6,7 @@ apply plugin: 'componentization'
 componentization {
   debugMode = true
   incremental = true
+  // resourcesDir = "build/resources"
   includeModules = ['app', '^libra.*', '^viewpager.*']
   includeJars = ['clase']
   includePackages = ['com.bhb.android']
@@ -14,17 +15,9 @@ componentization {
 
 android {
 
-  sourceSets {
-    main {
-      jniLibs.
-      res
-      resources
-    }
-  }
-
 }
 
 dependencies {
-//  annotationProcessor project(':compiler')
-//  kapt project(':compiler')
+  annotationProcessor project(':compiler')
+  kapt project(':compiler')
 }

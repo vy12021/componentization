@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.bhb.android.componentization">
+    package="com.bhb.android.app">
 
     <application
         android:name="com.bhb.android.app.TheApplication"

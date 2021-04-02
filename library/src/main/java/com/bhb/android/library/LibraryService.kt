@@ -1,4 +1,4 @@
-package com.bhb.android.componentization.library
+package com.bhb.android.library
 
 import android.util.Log
 import com.bhb.android.componentization.Service

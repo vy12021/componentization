@@ -22,7 +22,7 @@ group = GROUP
 
 def getReleaseRepositoryUrl() {
   return hasProperty('RELEASE_REPOSITORY_URL') ? RELEASE_REPOSITORY_URL
-          : 'https://nexus.bhbcode.com/repository/android/'
+          : 'https://nexus.bhbcode.com/repository/android-plugin/'
 }
 
 def getRepositoryUsername() {

@@ -21,16 +21,12 @@ import com.sun.tools.javac.code.Type;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessor;
 import net.ltgt.gradle.incap.IncrementalAnnotationProcessorType;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -106,7 +102,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private Map<String, String> options;
   private Set<String> registers = new HashSet<>();
   private String moduleName;
-  private String appDirectory;
+  private String applicationDirectory;
   private String resourcesDirectory;
 
   @Override
@@ -117,8 +113,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     logger = env.getMessager();
     filer = env.getFiler();
     moduleName = options.get(OPTION_MODULE_NAME);
-    appDirectory = options.get(OPTION_PLUGIN_DIR);
+    applicationDirectory = options.get(OPTION_PLUGIN_DIR);
     resourcesDirectory = options.get(OPTION_RESOURCES_DIR);
+    logger.printMessage(Diagnostic.Kind.WARNING,
+            "options--->{moduleName: " + moduleName
+                    + ", applicationDirectory: " + applicationDirectory
+                    + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
     try {
       trees = Trees.instance(processingEnv);
     } catch (IllegalArgumentException ignored) {
@@ -224,7 +224,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       }
     }
     Properties properties = new Properties();
-    File propDir = new File(appDirectory, resourcesDirectory);
+    logger.printMessage(Diagnostic.Kind.WARNING,
+            "generateRegisterProperty--->" +
+                    "{moduleName: " + moduleName
+                    + ", applicationDirectory: " + applicationDirectory
+                    + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
+    File propDir = new File(applicationDirectory, resourcesDirectory);
     File propFile = new File(propDir, "module-register.properties");
     if (!propDir.exists() && !propDir.mkdirs()) {
       logger.printMessage(Diagnostic.Kind.ERROR, "创建资源文件夹失败: " + propDir + "\n ");
@@ -235,7 +240,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       return;
     }
     // 锁文件生成到插件build目录
-    File lockFile = new File(new File(appDirectory, "build"), "module-register.lock");
+    File lockFile = new File(new File(applicationDirectory, "build"), "module-register.lock");
     while (lockFile.exists()) {
       Thread.sleep(5);
     }
@@ -534,7 +539,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
    * 尝试进行文件锁处理
    */
   private synchronized void lockWithFile(String fileName, Runnable closure) throws Exception {
-    File lockFile = new File(appDirectory, fileName);
+    File lockFile = new File(applicationDirectory, fileName);
     while (lockFile.exists()) {
       Thread.sleep(10);
     }

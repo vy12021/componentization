@@ -1,8 +1,8 @@
 package com.bhb.android.componentization;
 
-import org.junit.Test;
+import com.bhb.android.app.FunAAPI;
 
-import static org.junit.Assert.*;
+import org.junit.Test;
 
 /**
  * Example local unit test, which will execute on the development machine (host).

@@ -4,8 +4,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.bhb.android.componentization.AutoWired
-import com.bhb.android.componentization.R
-import com.bhb.android.componentization.library.AppAPI
+import com.bhb.android.library.AppAPI
 
 class MainActivity: AppCompatActivity() {
 

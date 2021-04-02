@@ -18,6 +18,7 @@ import java.util.*
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
+import kotlin.collections.ArrayList
 
 /**
  * Android插件提供的资源转换器
@@ -135,30 +136,42 @@ class ComponentScanner(androidExt: AppExtension,
   private val registers = mutableSetOf<CtClass>()
 
   private lateinit var outputProvider: TransformOutputProvider
-  private lateinit var allInputs: Collection<TransformInput>
+  private lateinit var transformInputs: Collection<TransformInput>
+  private lateinit var referenceInputs: Collection<TransformInput>
 
   override fun getName() = "ComponentScanner"
 
   override fun getInputTypes(): MutableSet<QualifiedContent.ContentType>
           = mutableSetOf(QualifiedContent.DefaultContentType.CLASSES)
 
+  /**
+   * 返回需要被处理的Project项目资源来源
+   */
   override fun getScopes(): MutableSet<in QualifiedContent.Scope> = mutableSetOf(
-          // 扫描引入的componentization相关依赖，导入到classpath中
-          QualifiedContent.Scope.EXTERNAL_LIBRARIES,
           // 扫描子工程模块，导入到classpath中
           QualifiedContent.Scope.SUB_PROJECTS,
           // 扫描当前插件工程，导入到classpath中
           QualifiedContent.Scope.PROJECT,
   )
 
-  override fun isIncremental() = false
+  /**
+   * 返回可能使用到但是不会被处理的lib/aar资源来源
+   */
+  override fun getReferencedScopes(): MutableSet<in QualifiedContent.Scope> = mutableSetOf(
+          // 扫描引入的componentization相关依赖，导入到classpath中
+          QualifiedContent.Scope.EXTERNAL_LIBRARIES,
+  )
+
+  override fun isIncremental() = config.incremental
 
   override fun transform(transformInvocation: TransformInvocation) {
     println(">>>>>>>>>>>>>>>>>>>>>>启动扫描并注册和注入组件任务<<<<<<<<<<<<<<<<<<<<<<<")
     println("插件配置：$config")
     val startTime = System.currentTimeMillis()
     super.transform(transformInvocation)
-    allInputs = transformInvocation.inputs
+
+    transformInputs = transformInvocation.inputs
+    referenceInputs = transformInvocation.referencedInputs
     outputProvider = transformInvocation.outputProvider.apply {
       // 清理所有缓存文件
       if (!transformInvocation.isIncremental) {
@@ -171,22 +184,12 @@ class ComponentScanner(androidExt: AppExtension,
     classPaths.add(classPool.appendClassPath(androidJar))
     val inputs = mutableListOf<QualifiedContent>()
     // 收集必要的输入建立完成的classpath环境
-    val componentizationJarInput =
-            collectInputs(classPool, inputs, classPaths)
+    collectInputs(classPool, inputs, classPaths)
             ?: throw RuntimeException("没有查找到组件工具：$COMPONENTIZATION")
     // 收集注册信息，并转换相关类
     transformClasses(classPool, inputs)
     // 验证注册信息正确性
     checkRegisterValid(classPool)
-    // 注入自动化注册逻辑，并重新打包
-    componentizationJarInput.apply {
-      if (config.incremental) {
-        file.copyTo(getOutput(this))
-      } else {
-        repackageJar(classPool, this, getOutput(this),
-                listOf(transformComponentizationJar(classPool, this)))
-      }
-    }
     // 释放类资源
     freeClassPoll(classPool, classPaths)
     println(">>>>>>>>>>>>>>>>>>扫描并注册和注入组件总共耗时：" +
@@ -201,27 +204,40 @@ class ComponentScanner(androidExt: AppExtension,
    * 收集输入的一些上下文信息
    */
   private fun collectInputs(classPool: ClassPool,
-                            inputs: MutableList<QualifiedContent>,
+                            transInputs: MutableList<QualifiedContent>,
                             classPaths: MutableList<ClassPath>): JarInput? {
     var componentizationJarInput: JarInput? = null
-    allInputs.forEach input@{ input ->
-      input.jarInputs.forEach jarInput@{ jarInput ->
-        if (jarInput.status == Status.REMOVED) {
-          return@jarInput
+    val scanInputs = fun (inputs: Collection<TransformInput>, readOnly: Boolean) {
+      inputs.forEach input@{ input ->
+        input.jarInputs.forEach jarInput@{ jarInput ->
+          if (jarInput.status == Status.REMOVED) {
+            return@jarInput
+          }
+          classPaths.add(classPool.appendClassPath(jarInput.file.absolutePath))
+          if (null == componentizationJarInput && null != classPool.getOrNull(COMPONENTIZATION)) {
+            componentizationJarInput = jarInput
+            println("查找到组件管理类: $COMPONENTIZATION 在${jarInput.file.absolutePath}中")
+          }
+          if (jarInput.status == Status.NOTCHANGED) {
+            return@jarInput
+          }
+          if (jarInput.status == Status.CHANGED) {
+
+          }
+          if (!readOnly) {
+            transInputs.add(jarInput)
+          }
         }
-        classPaths.add(classPool.appendClassPath(jarInput.file.absolutePath))
-        if (null == componentizationJarInput && null != classPool.getOrNull(COMPONENTIZATION)) {
-          componentizationJarInput = jarInput
-          println("查找到组件管理类: $COMPONENTIZATION 在${jarInput.file.absolutePath}中")
-          return@jarInput
+        input.directoryInputs.forEach dirInput@{ dirInput ->
+          classPaths.add(classPool.appendClassPath(dirInput.file.absolutePath))
+          if (!readOnly) {
+            transInputs.add(dirInput)
+          }
         }
-        inputs.add(jarInput)
-      }
-      input.directoryInputs.forEach dirInput@{ dirInput ->
-        classPaths.add(classPool.appendClassPath(dirInput.file.absolutePath))
-        inputs.add(dirInput)
       }
     }
+    scanInputs(referenceInputs, true)
+    scanInputs(transformInputs, false)
     return componentizationJarInput
   }
 
@@ -241,16 +257,16 @@ class ComponentScanner(androidExt: AppExtension,
           transformComponentsFromJar(classPool, input).apply {
             classes.addAll(this)
             if (isNotEmpty()) {
-              repackageJar(classPool, input,  jarOutput, this)
+              repackageJar(classPool, input, jarOutput, this)
               return@input
             }
           }
         }
-        input.file.copyTo(jarOutput)
+        input.file.copyTo(jarOutput, true)
       } else if (input is DirectoryInput) {
         val dirOutput = getOutput(input)
         // 目录先copy，然后覆盖被修改的类
-        input.file.copyRecursively(dirOutput)
+        input.file.copyRecursively(dirOutput, true)
         // 兼容java的classes目录和kotlin的kotlin-classes目录，或者其他的Transform中传递路径路径name为数字
         if (input.file.name.toIntOrNull() != null
                 || input.file.name == "classes"
@@ -296,7 +312,9 @@ class ComponentScanner(androidExt: AppExtension,
                                          dirInput: DirectoryInput): List<CtClass> {
     println("transformComponentsFromDir: ${dirInput.file.absolutePath}")
     val transformedClasses = mutableListOf<CtClass>()
-    getAllFiles(dirInput.file).forEach { classFile ->
+    dirInput.changedFiles.filter {
+      it.value == Status.ADDED || it.value == Status.CHANGED
+    }.map { it.key }.forEach { classFile ->
       val classEntryName: String = classFile.absolutePath
               .substring(dirInput.file.absolutePath.length + 1)
               .replace("\\", "/")

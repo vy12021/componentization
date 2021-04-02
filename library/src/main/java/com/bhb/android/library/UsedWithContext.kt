@@ -1,4 +1,4 @@
-package com.bhb.android.componentization.library
+package com.bhb.android.library
 
 import android.content.Context
 import com.bhb.android.componentization.AutoWired

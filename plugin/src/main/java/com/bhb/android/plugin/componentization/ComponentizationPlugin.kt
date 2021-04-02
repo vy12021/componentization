@@ -5,6 +5,7 @@ import com.android.build.gradle.LibraryExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.plugin.KaptExtension
+import java.io.File
 import java.util.*
 
 /**
@@ -35,11 +36,10 @@ class ComponentizationPlugin: Plugin<Project> {
 
   private val annotationConfig = "${Group}:compiler:${Version}"
   private val runtimeConfig = "${Group}:componentization:${Version}"
-
-  private lateinit var applicationProject: Project
+  private lateinit var pluginProjectDir: File
 
   override fun apply(project: Project) {
-    applicationProject = project
+    pluginProjectDir = project.projectDir
     println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin<<<<<<<<<<<<<<<<<<<<<<")
     val applicationExt = project.extensions.findByType(AppExtension::class.java)!!
     config = try {
@@ -52,11 +52,11 @@ class ComponentizationPlugin: Plugin<Project> {
     applicationExt.apply {
       registerTransform(ComponentScanner(this, config))
       // fixme 如果在主项目的afterEvaluate中注入依赖会导致注解处理器失效？？？
-      injectDependency(project)
+      // injectDependency(project)
+      injectCompileOptions(project)
       project.afterEvaluate {
+        // sourceSets.maybeCreate("main").resources.srcDir(config.resourcesDir)
         // 添加资源目录
-        // applicationExt.sourceSets.maybeCreate("main").resources.srcDir(config.resourcesDir)
-        injectCompileOptions(project)
         project.rootProject.subprojects {subProject ->
           if (subProject.name == project.name ||
                   !matchProject(config.includeModules, subProject)) {
@@ -64,7 +64,7 @@ class ComponentizationPlugin: Plugin<Project> {
           }
           project.addDependency("implementation", subProject)
           subProject.afterEvaluate {
-            injectDependency(it)
+            // injectDependency(it)
             injectCompileOptions(subProject)
           }
           config.addModuleDir(subProject.projectDir.absolutePath)
@@ -82,33 +82,27 @@ class ComponentizationPlugin: Plugin<Project> {
   }
 
   /**
-   * 注入编译选项
+   * 注入编译选项，如果是入口Project则必须在evaluated之前配置
    */
   private fun injectCompileOptions(project: Project) {
     val options = mapOf(
             OPTION_MODULE_NAME to project.name,
-            OPTION_PLUGIN_DIR to applicationProject.projectDir.absolutePath,
+            OPTION_PLUGIN_DIR to pluginProjectDir.absolutePath,
             OPTION_RESOURCES_DIR to config.resourcesDir
     )
     if (project.isApplication()) {
-      project.extensions.findByType(AppExtension::class.java)?.defaultConfig?.apply {
-        javaCompileOptions {
-          annotationProcessorOptions {
-            arguments.putAll(options)
-          }
-        }
-      }
+      project.extensions.findByType(AppExtension::class.java)
     } else {
-      project.extensions.findByType(LibraryExtension::class.java)?.defaultConfig?.apply {
-        javaCompileOptions {
-          annotationProcessorOptions {
-            arguments.putAll(options)
-          }
-        }
+      project.extensions.findByType(LibraryExtension::class.java)
+    }!!.defaultConfig.javaCompileOptions {
+      println("injectCompileOptions: ${project.name}--->javaCompileOptions $options")
+      annotationProcessorOptions {
+        arguments.putAll(options)
       }
     }
     if (project.hasKaptPlugin()) {
       project.extensions.findByType(KaptExtension::class.java)?.arguments {
+        println("injectCompileOptions: ${project.name}--->kaptOptions $options")
         options.forEach { (option, value) ->
           arg(option, value)
         }
