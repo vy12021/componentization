@@ -1,11 +1,11 @@
 package com.bhb.android.plugin.componentization
 
 import com.android.build.gradle.AppExtension
+import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.LibraryExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.plugin.KaptExtension
-import java.io.File
 import java.util.*
 
 /**
@@ -36,41 +36,50 @@ class ComponentizationPlugin: Plugin<Project> {
 
   private val annotationConfig = "${Group}:compiler:${Version}"
   private val runtimeConfig = "${Group}:componentization:${Version}"
-  private lateinit var pluginProjectDir: File
 
   override fun apply(project: Project) {
-    pluginProjectDir = project.projectDir
-    println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin<<<<<<<<<<<<<<<<<<<<<<")
-    val applicationExt = project.extensions.findByType(AppExtension::class.java)!!
+    println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin[${project.name}]<<<<<<<<<<<<<<<<<<<<<<")
     config = try {
       project.extensions.create("componentization", ComponentizationConfig::class.java)
     } catch (e: Exception) {
       e.printStackTrace()
       ComponentizationConfig()
     }
+    if (project.isRootProject()) {
+      project.afterEvaluate {
+        project.eachSubProject { subProject ->
+          subProject.plugins.apply(ComponentizationPlugin::class.java)
+        }
+      }
+      return
+    }
     // 不能在此处使用扩展配置，需要至少在下一条任务中才能使用，此处扩展属性dsl并没有读取和装载
-    applicationExt.apply {
+    project.requireAndroidExt().apply {
       registerTransform(ComponentScanner(this, config))
       // fixme 如果在主项目的afterEvaluate中注入依赖会导致注解处理器失效？？？
       // injectDependency(project)
       injectCompileOptions(project)
+
+      if (!project.isApplication()) {
+        return
+      }
+
       project.afterEvaluate {
-        // sourceSets.maybeCreate("main").resources.srcDir(config.resourcesDir)
         // 添加资源目录
-        project.rootProject.subprojects {subProject ->
-          if (subProject.name == project.name ||
-                  !matchProject(config.includeModules, subProject)) {
-            return@subprojects
-          }
+        // sourceSets.maybeCreate("main").resources.srcDir(config.resourcesDir)
+        it.eachSubProject { subProject ->
           project.addDependency("implementation", subProject)
           subProject.afterEvaluate {
             // injectDependency(it)
             injectCompileOptions(subProject)
           }
-          config.addModuleDir(subProject.projectDir.absolutePath)
         }
       }
     }
+  }
+
+  private fun Project.eachSubProject(iterator: (subProject: Project) -> Unit) {
+    subProjects { matchProject(config.includeModules, it) }.forEach(iterator)
   }
 
   /**
@@ -87,22 +96,16 @@ class ComponentizationPlugin: Plugin<Project> {
   private fun injectCompileOptions(project: Project) {
     val options = mapOf(
             OPTION_MODULE_NAME to project.name,
-            OPTION_PLUGIN_DIR to pluginProjectDir.absolutePath,
+            OPTION_PLUGIN_DIR to project.requireApplicationProject().projectDir.absolutePath,
             OPTION_RESOURCES_DIR to config.resourcesDir
     )
-    if (project.isApplication()) {
-      project.extensions.findByType(AppExtension::class.java)
-    } else {
-      project.extensions.findByType(LibraryExtension::class.java)
-    }!!.defaultConfig.javaCompileOptions {
-      println("injectCompileOptions: ${project.name}--->javaCompileOptions $options")
+    project.requireAndroidExt().defaultConfig.javaCompileOptions {
       annotationProcessorOptions {
         arguments.putAll(options)
       }
     }
     if (project.hasKaptPlugin()) {
       project.extensions.findByType(KaptExtension::class.java)?.arguments {
-        println("injectCompileOptions: ${project.name}--->kaptOptions $options")
         options.forEach { (option, value) ->
           arg(option, value)
         }
@@ -123,16 +126,46 @@ class ComponentizationPlugin: Plugin<Project> {
 
 }
 
+private fun Project.requireApplicationProject(): Project {
+  if (this.isApplication()) return this
+  rootProject.subprojects.forEach {
+    if (it.isApplication()) {
+      return@requireApplicationProject it
+    }
+  }
+  throw IllegalStateException()
+}
+
+private fun Project.requireAndroidExt(): BaseExtension {
+  return if (isApplication()) {
+    project.extensions.findByType(AppExtension::class.java)
+  } else {
+    project.extensions.findByType(LibraryExtension::class.java)
+  } as BaseExtension
+}
+
+private fun Project.isRootProject() = this == rootProject
+
 private fun Project.isApplication() = this.pluginManager.hasPlugin("com.android.application")
 
 private fun Project.isLibrary() = this.pluginManager.hasPlugin("com.android.library")
 
 private fun Project.hasKaptPlugin() = this.pluginManager.hasPlugin("kotlin-kapt")
 
+private fun Project.subProjects(filter: (subProject: Project) -> Boolean): Collection<Project> {
+  val subProjects = mutableListOf<Project>()
+  rootProject.subprojects.forEach { subProject ->
+    if (subProject.name == name || !filter(subProject)) {
+      return@forEach
+    }
+    subProjects.add(subProject)
+  }
+  return subProjects
+}
+
 private fun Project.addDependency(configuration: String, vararg dependencies: Any) {
   dependencies.forEach {
     this.dependencies.add(configuration, it)
-    println("injectDependency: ${name}---> $configuration $it")
   }
 }
 
@@ -140,9 +173,7 @@ private fun Project.addProcessor(vararg dependencies: Any) {
   dependencies.forEach {
     if (hasKaptPlugin()) {
       this.dependencies.add("kapt", it)
-      println("injectDependency: ${name}---> kapt $it")
     }
     this.dependencies.add("annotationProcessor", it)
-    println("injectDependency: ${name}---> annotationProcessor $it")
   }
 }

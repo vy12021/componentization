@@ -2,6 +2,7 @@ package com.bhb.android.plugin.componentization
 
 import com.android.build.api.transform.*
 import com.android.build.gradle.AppExtension
+import com.android.build.gradle.BaseExtension
 import javassist.ClassPath
 import javassist.ClassPool
 import javassist.CtClass
@@ -24,7 +25,7 @@ import kotlin.collections.ArrayList
  * Android插件提供的资源转换器
  * Created by Tesla on 2020/09/30.
  */
-class ComponentScanner(androidExt: AppExtension,
+class ComponentScanner(androidExt: BaseExtension,
                        private val config: ComponentizationConfig): Transform() {
 
   companion object {
@@ -210,6 +211,7 @@ class ComponentScanner(androidExt: AppExtension,
     val scanInputs = fun (inputs: Collection<TransformInput>, readOnly: Boolean) {
       inputs.forEach input@{ input ->
         input.jarInputs.forEach jarInput@{ jarInput ->
+          println("scanInputs--->file: ${jarInput.file}, status: ${jarInput.status}")
           if (jarInput.status == Status.REMOVED) {
             return@jarInput
           }
@@ -229,6 +231,7 @@ class ComponentScanner(androidExt: AppExtension,
           }
         }
         input.directoryInputs.forEach dirInput@{ dirInput ->
+          println("scanInputs--->file: ${dirInput.file}, changedFiles: ${dirInput.changedFiles}")
           classPaths.add(classPool.appendClassPath(dirInput.file.absolutePath))
           if (!readOnly) {
             transInputs.add(dirInput)
@@ -236,7 +239,9 @@ class ComponentScanner(androidExt: AppExtension,
         }
       }
     }
+    println("scanInputs---> referenceInputs: $referenceInputs")
     scanInputs(referenceInputs, true)
+    println("scanInputs---> transformInputs: $transformInputs")
     scanInputs(transformInputs, false)
     return componentizationJarInput
   }
