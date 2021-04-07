@@ -7,7 +7,7 @@ import com.bhb.android.componentization.Service
 import com.bhb.android.library.AppAPI
 
 @Service
-object FunAService: FunAAPI, AppAPI {
+object FunXXService: FunAAPI, AppAPI {
 
   @AutoWired
   private lateinit var contextAPI: ContextAPI

@@ -1,23 +1,12 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
-/*apply plugin: 'componentization'
-
-componentization {
-  debugMode = true
-  incremental = true
-  // resourcesDir = "build/resources"
-  includeModules = ['app', '^libra.*', '^viewpager.*']
-  includeJars = ['clase']
-  includePackages = ['com.bhb.android']
-  excludePackages = ['kotlin', 'kotlinx', 'android', 'androidx', 'org.jetbrains']
-}*/
 
 android {
 
 }
 
 dependencies {
-  annotationProcessor project(':compiler')
-  kapt project(':compiler')
+  /*annotationProcessor project(':compiler')
+  kapt project(':compiler')*/
 }

@@ -25,6 +25,10 @@ public class ComponentizationConfig {
    */
   boolean incremental = false;
   /**
+   * 应用模块名称，预设置项，方面某些前置配置
+   */
+  String applicationModule = "app";
+  /**
    * 支持的导入module名称(正则)
    */
   String[] includeModules = new String[0];
@@ -109,12 +113,21 @@ public class ComponentizationConfig {
     this.modulesDir.addAll(Arrays.asList(modules));
   }
 
+  public String getApplicationModule() {
+    return applicationModule;
+  }
+
+  public void setApplicationModule(String applicationModule) {
+    this.applicationModule = applicationModule;
+  }
+
   @Override
   public String toString() {
     return "ComponentizationConfig{" +
             "debugMode=" + debugMode +
             ", incremental=" + incremental +
             ", resourcesDir=" + resourcesDir +
+            ", applicationModule=" + applicationModule +
             ", includeModules=" + Arrays.toString(includeModules) +
             ", includeJars=" + Arrays.toString(includeJars) +
             ", includePackages=" + Arrays.toString(includePackages) +

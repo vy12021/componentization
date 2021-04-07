@@ -15,6 +15,7 @@ import java.util.*
 class ComponentizationPlugin: Plugin<Project> {
 
   companion object {
+    private const val OPTION_DEBUG_MODE = "option.debug.enable"
     private const val OPTION_MODULE_NAME = "option.module.name"
     private const val OPTION_PLUGIN_DIR = "option.plugin.module.dir"
     private const val OPTION_RESOURCES_DIR = "option.resources.dir"
@@ -38,49 +39,49 @@ class ComponentizationPlugin: Plugin<Project> {
   private val runtimeConfig = "${Group}:componentization:${Version}"
 
   override fun apply(project: Project) {
-    println(">>>>>>>>>>>>>>>>>>>>>>注册插件ComponentizationPlugin[${project.name}]<<<<<<<<<<<<<<<<<<<<<<")
-    config = try {
-      project.extensions.create("componentization", ComponentizationConfig::class.java)
-    } catch (e: Exception) {
-      e.printStackTrace()
-      ComponentizationConfig()
-    }
+    println(">>>>>>>>>>>>>>>>>>>>>>注册插件Componentization[${project.name}]<<<<<<<<<<<<<<<<<<<<<<")
+    config = project.getComponentConfig()
+
     if (project.isRootProject()) {
       project.afterEvaluate {
         project.eachSubProject { subProject ->
-          subProject.plugins.apply(ComponentizationPlugin::class.java)
+          if (config.incremental || subProject.isApplicationModule()) {
+            subProject.plugins.apply(ComponentizationPlugin::class.java)
+          }
         }
       }
       return
     }
-    // 不能在此处使用扩展配置，需要至少在下一条任务中才能使用，此处扩展属性dsl并没有读取和装载
-    project.requireAndroidExt().apply {
-      registerTransform(ComponentScanner(this, config))
-      // fixme 如果在主项目的afterEvaluate中注入依赖会导致注解处理器失效？？？
-      // injectDependency(project)
-      injectCompileOptions(project)
 
-      if (!project.isApplication()) {
-        return
+    project.afterEvaluate {
+      val android = it.requireAndroidExt().apply {
+        println("Project[${it.name}].registerTransform(${config})")
+        registerTransform(ComponentScanner(it))
+        injectDependency(project)
+        injectCompileOptions(it)
       }
 
-      project.afterEvaluate {
-        // 添加资源目录
-        // sourceSets.maybeCreate("main").resources.srcDir(config.resourcesDir)
-        it.eachSubProject { subProject ->
-          project.addDependency("implementation", subProject)
-          subProject.afterEvaluate {
-            // injectDependency(it)
-            injectCompileOptions(subProject)
-          }
+      if (!it.isApplicationModule()) {
+        return@afterEvaluate
+      }
+
+      // 添加资源目录
+      android.sourceSets.maybeCreate("main").resources.srcDir(config.resourcesDir)
+      it.eachSubProject { subProject ->
+        project.addDependency("implementation", subProject)
+        subProject.afterEvaluate {
+          injectDependency(subProject)
+          injectCompileOptions(subProject)
         }
       }
     }
   }
 
   private fun Project.eachSubProject(iterator: (subProject: Project) -> Unit) {
-    subProjects { matchProject(config.includeModules, it) }.forEach(iterator)
+    subProjects { it.isApplicationModule() || matchProject(config.includeModules, it) }.forEach(iterator)
   }
+
+  private fun Project.isApplicationModule() = isApplication() || config.applicationModule == name
 
   /**
    * 注入必要依赖
@@ -95,10 +96,10 @@ class ComponentizationPlugin: Plugin<Project> {
    */
   private fun injectCompileOptions(project: Project) {
     val options = mapOf(
+            OPTION_DEBUG_MODE to config.debugMode.toString(),
             OPTION_MODULE_NAME to project.name,
             OPTION_PLUGIN_DIR to project.requireApplicationProject().projectDir.absolutePath,
-            OPTION_RESOURCES_DIR to config.resourcesDir
-    )
+            OPTION_RESOURCES_DIR to config.resourcesDir)
     project.requireAndroidExt().defaultConfig.javaCompileOptions {
       annotationProcessorOptions {
         arguments.putAll(options)
@@ -119,14 +120,14 @@ class ComponentizationPlugin: Plugin<Project> {
         if (it) return true
       }
     }
-    return includeModules.find {moduleName ->
+    return includeModules.find { moduleName ->
       subProject.name == moduleName || subProject.name.matches(moduleName.toRegex())
     } != null
   }
 
 }
 
-private fun Project.requireApplicationProject(): Project {
+internal fun Project.requireApplicationProject(): Project {
   if (this.isApplication()) return this
   rootProject.subprojects.forEach {
     if (it.isApplication()) {
@@ -136,7 +137,7 @@ private fun Project.requireApplicationProject(): Project {
   throw IllegalStateException()
 }
 
-private fun Project.requireAndroidExt(): BaseExtension {
+internal fun Project.requireAndroidExt(): BaseExtension {
   return if (isApplication()) {
     project.extensions.findByType(AppExtension::class.java)
   } else {
@@ -144,15 +145,28 @@ private fun Project.requireAndroidExt(): BaseExtension {
   } as BaseExtension
 }
 
-private fun Project.isRootProject() = this == rootProject
+internal fun Project.isRootProject() = this == rootProject
 
-private fun Project.isApplication() = this.pluginManager.hasPlugin("com.android.application")
+internal fun Project.isApplication() = this.pluginManager.hasPlugin("com.android.application")
 
-private fun Project.isLibrary() = this.pluginManager.hasPlugin("com.android.library")
+internal fun Project.isLibrary() = this.pluginManager.hasPlugin("com.android.library")
 
-private fun Project.hasKaptPlugin() = this.pluginManager.hasPlugin("kotlin-kapt")
+internal fun Project.hasKaptPlugin() = this.pluginManager.hasPlugin("kotlin-kapt")
 
-private fun Project.subProjects(filter: (subProject: Project) -> Boolean): Collection<Project> {
+internal fun Project.getComponentConfig(): ComponentizationConfig {
+  return try {
+    // 先查找，如果没有找到再创建，如果创建失败
+    rootProject.extensions.let {
+      it.findByType(ComponentizationConfig::class.java)
+              ?: it.create("componentization", ComponentizationConfig::class.java)
+    }
+  } catch (e: Exception) {
+    e.printStackTrace()
+    ComponentizationConfig()
+  }
+}
+
+internal fun Project.subProjects(filter: (subProject: Project) -> Boolean): Collection<Project> {
   val subProjects = mutableListOf<Project>()
   rootProject.subprojects.forEach { subProject ->
     if (subProject.name == name || !filter(subProject)) {
@@ -163,13 +177,13 @@ private fun Project.subProjects(filter: (subProject: Project) -> Boolean): Colle
   return subProjects
 }
 
-private fun Project.addDependency(configuration: String, vararg dependencies: Any) {
+internal fun Project.addDependency(configuration: String, vararg dependencies: Any) {
   dependencies.forEach {
     this.dependencies.add(configuration, it)
   }
 }
 
-private fun Project.addProcessor(vararg dependencies: Any) {
+internal fun Project.addProcessor(vararg dependencies: Any) {
   dependencies.forEach {
     if (hasKaptPlugin()) {
       this.dependencies.add("kapt", it)

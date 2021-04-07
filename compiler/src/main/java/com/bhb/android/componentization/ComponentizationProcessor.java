@@ -83,6 +83,10 @@ public final class ComponentizationProcessor extends AbstractProcessor {
           PACKAGE_SPACE, "Meta");
 
   /**
+   * 模块名注解处理器选项，值为boolean表达调试开关是否开启
+   */
+  private static final String OPTION_DEBUG_MODE = "option.debug.enable";
+  /**
    * 模块名注解处理器选项，值为String表达当前模块名称
    */
   private static final String OPTION_MODULE_NAME = "option.module.name";
@@ -101,6 +105,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private Messager logger;
   private Map<String, String> options;
   private Set<String> registers = new HashSet<>();
+  private boolean debugEnabled;
   private String moduleName;
   private String applicationDirectory;
   private String resourcesDirectory;
@@ -112,6 +117,8 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     typeUtils = env.getTypeUtils();
     logger = env.getMessager();
     filer = env.getFiler();
+    debugEnabled = options.containsKey(OPTION_DEBUG_MODE)
+            && Boolean.parseBoolean(options.get(OPTION_DEBUG_MODE));
     moduleName = options.get(OPTION_MODULE_NAME);
     applicationDirectory = options.get(OPTION_PLUGIN_DIR);
     resourcesDirectory = options.get(OPTION_RESOURCES_DIR);
@@ -224,11 +231,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       }
     }
     Properties properties = new Properties();
-    logger.printMessage(Diagnostic.Kind.WARNING,
-            "generateRegisterProperty--->" +
-                    "{moduleName: " + moduleName
-                    + ", applicationDirectory: " + applicationDirectory
-                    + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
+    if (debugEnabled) {
+      logger.printMessage(Diagnostic.Kind.NOTE,
+              "{moduleName: " + moduleName
+                      + ", applicationDirectory: " + applicationDirectory
+                      + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
+    }
     File propDir = new File(applicationDirectory, resourcesDirectory);
     File propFile = new File(propDir, "module-register.properties");
     if (!propDir.exists() && !propDir.mkdirs()) {
@@ -245,12 +253,21 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       Thread.sleep(5);
     }
     lockFile.createNewFile();
-    logger.printMessage(Diagnostic.Kind.WARNING, "准备写入注册清单: " + propFile + "\n ");
+    if (debugEnabled) {
+      logger.printMessage(Diagnostic.Kind.NOTE,
+              "准备写入注册清单: " + propFile + "\n ");
+    }
     try (InputStream is = new FileInputStream(propFile)) {
       properties.load(is);
-      logger.printMessage(Diagnostic.Kind.WARNING, "已有属性--->" + properties.keySet() + "\n ");
+      if (debugEnabled) {
+        logger.printMessage(Diagnostic.Kind.NOTE,
+                "已有属性--->" + properties.keySet() + "\n ");
+      }
       properties.put(moduleName, classesBuilder.toString());
-      logger.printMessage(Diagnostic.Kind.WARNING, "写入属性--->" + moduleName + ": " + classesBuilder.toString() + "\n ");
+      if (debugEnabled) {
+        logger.printMessage(Diagnostic.Kind.NOTE,
+                "写入属性--->" + moduleName + ": " + classesBuilder.toString() + "\n ");
+      }
       try (OutputStream writer = new FileOutputStream(propFile)) {
         properties.store(writer, "module registers");
       }

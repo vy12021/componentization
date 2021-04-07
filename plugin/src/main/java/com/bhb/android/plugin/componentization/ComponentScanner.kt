@@ -1,8 +1,6 @@
 package com.bhb.android.plugin.componentization
 
 import com.android.build.api.transform.*
-import com.android.build.gradle.AppExtension
-import com.android.build.gradle.BaseExtension
 import javassist.ClassPath
 import javassist.ClassPool
 import javassist.CtClass
@@ -13,20 +11,19 @@ import javassist.bytecode.AnnotationsAttribute
 import javassist.bytecode.annotation.ArrayMemberValue
 import javassist.bytecode.annotation.BooleanMemberValue
 import javassist.bytecode.annotation.StringMemberValue
+import org.gradle.api.Project
 import java.io.File
 import java.io.IOException
 import java.util.*
 import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
-import kotlin.collections.ArrayList
 
 /**
  * Android插件提供的资源转换器
  * Created by Tesla on 2020/09/30.
  */
-class ComponentScanner(androidExt: BaseExtension,
-                       private val config: ComponentizationConfig): Transform() {
+class ComponentScanner(private val project: Project): Transform() {
 
   companion object {
     private const val PACKAGE = "com.bhb.android.componentization"
@@ -119,6 +116,10 @@ class ComponentScanner(androidExt: BaseExtension,
     return null == excludePackages.find { classEntryName.startsWith(it) }
   }
 
+  private val androidExt by lazy { project.requireAndroidExt() }
+
+  private val config by lazy { project.getComponentConfig() }
+
   /**
    * android sdk所在路径
    */
@@ -139,6 +140,7 @@ class ComponentScanner(androidExt: BaseExtension,
   private lateinit var outputProvider: TransformOutputProvider
   private lateinit var transformInputs: Collection<TransformInput>
   private lateinit var referenceInputs: Collection<TransformInput>
+  private lateinit var secondaryInputs: Collection<SecondaryInput>
 
   override fun getName() = "ComponentScanner"
 
@@ -148,20 +150,27 @@ class ComponentScanner(androidExt: BaseExtension,
   /**
    * 返回需要被处理的Project项目资源来源
    */
-  override fun getScopes(): MutableSet<in QualifiedContent.Scope> = mutableSetOf(
-          // 扫描子工程模块，导入到classpath中
-          QualifiedContent.Scope.SUB_PROJECTS,
-          // 扫描当前插件工程，导入到classpath中
-          QualifiedContent.Scope.PROJECT,
-  )
+  override fun getScopes(): MutableSet<in QualifiedContent.Scope> {
+    return mutableSetOf<QualifiedContent.Scope>().apply {
+      add(QualifiedContent.Scope.PROJECT)
+      if (!config.incremental) {
+        add(QualifiedContent.Scope.SUB_PROJECTS)
+        add(QualifiedContent.Scope.EXTERNAL_LIBRARIES)
+      }
+    }
+  }
 
   /**
    * 返回可能使用到但是不会被处理的lib/aar资源来源
    */
-  override fun getReferencedScopes(): MutableSet<in QualifiedContent.Scope> = mutableSetOf(
-          // 扫描引入的componentization相关依赖，导入到classpath中
-          QualifiedContent.Scope.EXTERNAL_LIBRARIES,
-  )
+  override fun getReferencedScopes(): MutableSet<in QualifiedContent.Scope> {
+    return mutableSetOf<QualifiedContent.Scope>().apply {
+      if (config.incremental) {
+        add(QualifiedContent.Scope.EXTERNAL_LIBRARIES)
+        add(QualifiedContent.Scope.SUB_PROJECTS)
+      }
+    }
+  }
 
   override fun isIncremental() = config.incremental
 
@@ -171,11 +180,12 @@ class ComponentScanner(androidExt: BaseExtension,
     val startTime = System.currentTimeMillis()
     super.transform(transformInvocation)
 
+    secondaryInputs = transformInvocation.secondaryInputs
     transformInputs = transformInvocation.inputs
     referenceInputs = transformInvocation.referencedInputs
     outputProvider = transformInvocation.outputProvider.apply {
       // 清理所有缓存文件
-      if (!transformInvocation.isIncremental) {
+      if (!config.incremental) {
         deleteAll()
       }
     }
@@ -183,12 +193,12 @@ class ComponentScanner(androidExt: BaseExtension,
     val classPaths = mutableListOf<ClassPath>()
     classPaths.add(classPool.appendSystemPath())
     classPaths.add(classPool.appendClassPath(androidJar))
-    val inputs = mutableListOf<QualifiedContent>()
+    val effectInputs = mutableListOf<QualifiedContent>()
     // 收集必要的输入建立完成的classpath环境
-    collectInputs(classPool, inputs, classPaths)
+    collectInputs(classPool, effectInputs, classPaths)
             ?: throw RuntimeException("没有查找到组件工具：$COMPONENTIZATION")
     // 收集注册信息，并转换相关类
-    transformClasses(classPool, inputs)
+    transformClasses(classPool, effectInputs)
     // 验证注册信息正确性
     checkRegisterValid(classPool)
     // 释放类资源
@@ -211,7 +221,6 @@ class ComponentScanner(androidExt: BaseExtension,
     val scanInputs = fun (inputs: Collection<TransformInput>, readOnly: Boolean) {
       inputs.forEach input@{ input ->
         input.jarInputs.forEach jarInput@{ jarInput ->
-          println("scanInputs--->file: ${jarInput.file}, status: ${jarInput.status}")
           if (jarInput.status == Status.REMOVED) {
             return@jarInput
           }
@@ -220,18 +229,11 @@ class ComponentScanner(androidExt: BaseExtension,
             componentizationJarInput = jarInput
             println("查找到组件管理类: $COMPONENTIZATION 在${jarInput.file.absolutePath}中")
           }
-          if (jarInput.status == Status.NOTCHANGED) {
-            return@jarInput
-          }
-          if (jarInput.status == Status.CHANGED) {
-
-          }
           if (!readOnly) {
             transInputs.add(jarInput)
           }
         }
         input.directoryInputs.forEach dirInput@{ dirInput ->
-          println("scanInputs--->file: ${dirInput.file}, changedFiles: ${dirInput.changedFiles}")
           classPaths.add(classPool.appendClassPath(dirInput.file.absolutePath))
           if (!readOnly) {
             transInputs.add(dirInput)
@@ -239,9 +241,7 @@ class ComponentScanner(androidExt: BaseExtension,
         }
       }
     }
-    println("scanInputs---> referenceInputs: $referenceInputs")
     scanInputs(referenceInputs, true)
-    println("scanInputs---> transformInputs: $transformInputs")
     scanInputs(transformInputs, false)
     return componentizationJarInput
   }
@@ -317,9 +317,7 @@ class ComponentScanner(androidExt: BaseExtension,
                                          dirInput: DirectoryInput): List<CtClass> {
     println("transformComponentsFromDir: ${dirInput.file.absolutePath}")
     val transformedClasses = mutableListOf<CtClass>()
-    dirInput.changedFiles.filter {
-      it.value == Status.ADDED || it.value == Status.CHANGED
-    }.map { it.key }.forEach { classFile ->
+    getAllFiles(dirInput.file).forEach { classFile ->
       val classEntryName: String = classFile.absolutePath
               .substring(dirInput.file.absolutePath.length + 1)
               .replace("\\", "/")
@@ -471,7 +469,7 @@ class ComponentScanner(androidExt: BaseExtension,
           registerMetas.put(apiType, serviceType)?.let {lastService ->
             throw IllegalArgumentException(
                     "接口 [${apiType}] 发现重复实现: \n" +
-                    "${serviceType}, ${lastService}")
+                    "$serviceType, $lastService")
           }
         }
       }
