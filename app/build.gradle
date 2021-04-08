@@ -1,9 +1,16 @@
+import com.android.build.gradle.AppExtension
+import com.android.build.gradle.BaseExtension
+
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 
 android {
 
+}
+
+afterEvaluate {
+  println("applicationVariants: ${(extensions.findByName("android") as AppExtension).applicationVariants.find().name}")
 }
 
 dependencies {

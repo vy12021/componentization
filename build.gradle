@@ -27,7 +27,7 @@ buildscript {
   dependencies {
     classpath "com.android.tools.build:gradle:${android_version}"
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
-    classpath 'com.bhb.android.plugin:componentization:0.4.9.65'
+    classpath 'com.bhb.android.plugin:componentization:0.4.10.4'
   }
 }
 
@@ -35,8 +35,8 @@ apply plugin: 'componentization'
 
 componentization {
   debugMode = false
-  incremental = false
-  // resourcesDir = "build/resources"
+  incremental = true
+  resourcesDir = "build/abccc/out"
   includeModules = ['^libra.*', '^viewpager.*']
   includeJars = ['clase']
   includePackages = ['com.bhb.android']

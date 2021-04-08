@@ -17,8 +17,11 @@ class ComponentizationPlugin: Plugin<Project> {
   companion object {
     private const val OPTION_DEBUG_MODE = "option.debug.enable"
     private const val OPTION_MODULE_NAME = "option.module.name"
-    private const val OPTION_PLUGIN_DIR = "option.plugin.module.dir"
+    private const val OPTION_ROOT_MODULE_DIR = "option.root.module.dir"
+    private const val OPTION_APP_MODULE_DIR = "option.app.module.dir"
     private const val OPTION_RESOURCES_DIR = "option.resources.dir"
+    private const val OPTION_RESOURCES_OUTPUT_DIR = "option.resources.output.dir"
+    private const val RESOURCES_OUTPUT_PREFIX = "build/intermediates/java_res"
   }
 
   private lateinit var config: ComponentizationConfig
@@ -54,7 +57,7 @@ class ComponentizationPlugin: Plugin<Project> {
     }
 
     project.afterEvaluate {
-      val android = it.requireAndroidExt().apply {
+      it.requireAndroidExt().apply {
         println("Project[${it.name}].registerTransform(${config})")
         registerTransform(ComponentScanner(it))
         injectDependency(project)
@@ -65,8 +68,6 @@ class ComponentizationPlugin: Plugin<Project> {
         return@afterEvaluate
       }
 
-      // 添加资源目录
-      android.sourceSets.maybeCreate("main").resources.srcDir(config.resourcesDir)
       it.eachSubProject { subProject ->
         project.addDependency("implementation", subProject)
         subProject.afterEvaluate {
@@ -74,6 +75,15 @@ class ComponentizationPlugin: Plugin<Project> {
           injectCompileOptions(subProject)
         }
       }
+
+      it.tasks.register("").configure {
+        it.doFirst {  }
+      }
+      it.tasks.whenObjectAdded {
+        if (it.name == )
+
+      }
+
     }
   }
 
@@ -95,11 +105,25 @@ class ComponentizationPlugin: Plugin<Project> {
    * 注入编译选项，如果是入口Project则必须在evaluated之前配置
    */
   private fun injectCompileOptions(project: Project) {
+    val resourcesDirs = StringBuilder()
+    project.getBuildNames().apply {
+      forEachIndexed { index, buildName ->
+        resourcesDirs.apply {
+          append(RESOURCES_OUTPUT_PREFIX).append("/")
+          append(buildName).append("/").append("out")
+        }
+        if (index < size - 1) {
+          resourcesDirs.append(",")
+        }
+      }
+    }
     val options = mapOf(
             OPTION_DEBUG_MODE to config.debugMode.toString(),
+            OPTION_ROOT_MODULE_DIR to project.rootProject.projectDir.absolutePath,
+            OPTION_APP_MODULE_DIR to project.requireApplicationProject().projectDir.absolutePath,
             OPTION_MODULE_NAME to project.name,
-            OPTION_PLUGIN_DIR to project.requireApplicationProject().projectDir.absolutePath,
-            OPTION_RESOURCES_DIR to config.resourcesDir)
+            OPTION_RESOURCES_DIR to config.resourcesDir,
+            OPTION_RESOURCES_OUTPUT_DIR to resourcesDirs.toString())
     project.requireAndroidExt().defaultConfig.javaCompileOptions {
       annotationProcessorOptions {
         arguments.putAll(options)
@@ -125,6 +149,16 @@ class ComponentizationPlugin: Plugin<Project> {
     } != null
   }
 
+}
+
+internal fun Project.getBuildNames(): Set<String> {
+  return (requireApplicationProject().requireAndroidExt() as AppExtension).let {
+    if (it.applicationVariants.isNotEmpty()) {
+      it.applicationVariants.map { it.name }
+    } else {
+      it.buildTypes.map { it.name }
+    }
+  }.toSet()
 }
 
 internal fun Project.requireApplicationProject(): Project {

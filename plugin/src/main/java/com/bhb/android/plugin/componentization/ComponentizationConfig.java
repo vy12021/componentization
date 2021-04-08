@@ -49,9 +49,9 @@ public class ComponentizationConfig {
    */
   List<String> modulesDir = new ArrayList<>();
   /**
-   * 资源目录
+   * 存放资源目录
    */
-  String resourcesDir = "src/main/resources";
+  String resourcesDir = "build/componentization/resources";
 
   public String[] getIncludeModules() {
     return includeModules;

@@ -309,7 +309,11 @@ public final class Componentization {
       Log.e(TAG, "loadModuleRegisters key: " + module);
       String classes = properties.getProperty(module);
       for (String clazzName : classes.split(",\\n*")) {
-        registers.add(loadClass(clazzName));
+        try {
+          registers.add(loadClass(clazzName));
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
       }
     }
     Log.e(TAG, "loadModuleRegisters completed");

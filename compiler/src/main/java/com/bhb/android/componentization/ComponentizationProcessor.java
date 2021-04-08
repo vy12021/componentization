@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -91,13 +92,21 @@ public final class ComponentizationProcessor extends AbstractProcessor {
    */
   private static final String OPTION_MODULE_NAME = "option.module.name";
   /**
-   * 项目根目录
+   * 根模块目录
    */
-  private static final String OPTION_PLUGIN_DIR = "option.plugin.module.dir";
+  private static final String OPTION_ROOT_MODULE_DIR = "option.root.module.dir";
   /**
-   * 资源目录，相对于模块目录
+   * 应用入口模块目录
+   */
+  private static final String OPTION_APP_MODULE_DIR = "option.app.module.dir";
+  /**
+   * 资源目录，相对于{@link #OPTION_ROOT_MODULE_DIR}
    */
   private static final String OPTION_RESOURCES_DIR = "option.resources.dir";
+  /**
+   * 资源的最终输出目录，是一个用,分隔的目录列表，需要全部进行copy一份 {@link #OPTION_APP_MODULE_DIR}
+   */
+  private static final String OPTION_RESOURCES_OUTPUT_DIR = "option.resources.output.dir";
 
   private Types typeUtils;
   private Filer filer;
@@ -107,8 +116,10 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private Set<String> registers = new HashSet<>();
   private boolean debugEnabled;
   private String moduleName;
+  private String rootDirectory;
   private String applicationDirectory;
   private String resourcesDirectory;
+  private String[] resourcesOutputDirectories;
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
@@ -120,12 +131,14 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     debugEnabled = options.containsKey(OPTION_DEBUG_MODE)
             && Boolean.parseBoolean(options.get(OPTION_DEBUG_MODE));
     moduleName = options.get(OPTION_MODULE_NAME);
-    applicationDirectory = options.get(OPTION_PLUGIN_DIR);
+    rootDirectory = options.get(OPTION_ROOT_MODULE_DIR);
+    applicationDirectory = options.get(OPTION_APP_MODULE_DIR);
     resourcesDirectory = options.get(OPTION_RESOURCES_DIR);
+    resourcesOutputDirectories = options.get(OPTION_RESOURCES_OUTPUT_DIR).split(",\\s*");
     logger.printMessage(Diagnostic.Kind.WARNING,
             "options--->{moduleName: " + moduleName
                     + ", applicationDirectory: " + applicationDirectory
-                    + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
+                    + ", resourcesDirectory: " + Arrays.toString(resourcesOutputDirectories) + "}\n ");
     try {
       trees = Trees.instance(processingEnv);
     } catch (IllegalArgumentException ignored) {
@@ -151,9 +164,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   @Override public Set<String> getSupportedOptions() {
     Set<String> options = new LinkedHashSet<>(4);
     if (trees != null) {
+      options.add(OPTION_DEBUG_MODE);
+      options.add(OPTION_ROOT_MODULE_DIR);
+      options.add(OPTION_APP_MODULE_DIR);
       options.add(OPTION_MODULE_NAME);
-      options.add(OPTION_PLUGIN_DIR);
       options.add(OPTION_RESOURCES_DIR);
+      options.add(OPTION_RESOURCES_OUTPUT_DIR);
       options.add(IncrementalAnnotationProcessorType.ISOLATING.getProcessorOption());
     }
     return options;
@@ -231,13 +247,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       }
     }
     Properties properties = new Properties();
-    if (debugEnabled) {
-      logger.printMessage(Diagnostic.Kind.NOTE,
-              "{moduleName: " + moduleName
-                      + ", applicationDirectory: " + applicationDirectory
-                      + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
-    }
-    File propDir = new File(applicationDirectory, resourcesDirectory);
+    File propDir = new File(rootDirectory, resourcesDirectory);
     File propFile = new File(propDir, "module-register.properties");
     if (!propDir.exists() && !propDir.mkdirs()) {
       logger.printMessage(Diagnostic.Kind.ERROR, "创建资源文件夹失败: " + propDir + "\n ");
@@ -248,7 +258,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       return;
     }
     // 锁文件生成到插件build目录
-    File lockFile = new File(new File(applicationDirectory, "build"), "module-register.lock");
+    File lockFile = new File(new File(rootDirectory, "build"), "module-register.lock");
     while (lockFile.exists()) {
       Thread.sleep(5);
     }
@@ -272,7 +282,48 @@ public final class ComponentizationProcessor extends AbstractProcessor {
         properties.store(writer, "module registers");
       }
     } finally {
+      for (String directory : resourcesOutputDirectories) {
+        copyFiles(propFile, new File(applicationDirectory, directory));
+      }
       lockFile.delete();
+    }
+  }
+
+  private void copyFiles(File origin, File... directories) throws IOException {
+    if (directories.length == 0) {
+      return;
+    }
+    File[] dsts = new File[directories.length];
+    FileOutputStream[] foss = new FileOutputStream[dsts.length];
+    for (int i = 0; i < directories.length; i++) {
+      File dir = directories[i];
+      dir.mkdirs();
+      File dst = new File(dir, origin.getName());
+      dsts[i] = dst;
+      if (!dst.exists()) {
+        dsts[i].createNewFile();
+      }
+      foss[i] = new FileOutputStream(dst);
+    }
+    try (FileInputStream fis = new FileInputStream(origin)) {
+      byte[] buffer = new byte[4096];
+      int len;
+      while (-1 != (len = fis.read(buffer))) {
+        for (FileOutputStream fos : foss) {
+          if (null != fos) {
+            fos.write(buffer, 0, len);
+          }
+        }
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    } finally {
+      for (FileOutputStream fos : foss) {
+        if (null != fos) {
+          fos.flush();
+          fos.close();
+        }
+      }
     }
   }
 
