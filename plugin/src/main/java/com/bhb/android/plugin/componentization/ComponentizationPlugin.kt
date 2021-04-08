@@ -76,6 +76,7 @@ class ComponentizationPlugin: Plugin<Project> {
         }
       }
 
+      // 注册自动copy注册配置任务，防止有缓存状态导致配置不能正确打包到apk
       it.tasks.register("").configure {
         it.doFirst {  }
       }
