@@ -6,6 +6,7 @@ import com.android.build.gradle.LibraryExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.plugin.KaptExtension
+import java.io.File
 import java.util.*
 
 /**
@@ -22,6 +23,8 @@ class ComponentizationPlugin: Plugin<Project> {
     private const val OPTION_RESOURCES_DIR = "option.resources.dir"
     private const val OPTION_RESOURCES_OUTPUT_DIR = "option.resources.output.dir"
     private const val RESOURCES_OUTPUT_PREFIX = "build/intermediates/java_res"
+
+    private const val REGISTER_FILE_NAME = "module-register.properties"
   }
 
   private lateinit var config: ComponentizationConfig
@@ -76,15 +79,16 @@ class ComponentizationPlugin: Plugin<Project> {
         }
       }
 
-      // 注册自动copy注册配置任务，防止有缓存状态导致配置不能正确打包到apk
-      /*it.tasks.register("").configure {
-        it.doFirst {  }
+      val propertiesFile = File(
+              project.rootProject.file(config.resourcesDir), REGISTER_FILE_NAME)
+      if (propertiesFile.exists()) {
+        it.getBuildNames().forEach { buildName ->
+          propertiesFile.copyTo(
+                  it.requireApplicationProject().file(RESOURCES_OUTPUT_PREFIX)
+                          .resolve(buildName).resolve("out")
+                          .resolve(REGISTER_FILE_NAME), true)
+        }
       }
-      it.tasks.whenObjectAdded {
-        if (it.name == )
-
-      }*/
-
     }
   }
 
@@ -98,8 +102,8 @@ class ComponentizationPlugin: Plugin<Project> {
    * 注入必要依赖
    */
   private fun injectDependency(project: Project) {
-    project.addDependency("implementation", runtimeConfig)
-    project.addProcessor(annotationConfig)
+    /*project.addDependency("implementation", runtimeConfig)
+    project.addProcessor(annotationConfig)*/
   }
 
   /**

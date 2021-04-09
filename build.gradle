@@ -27,14 +27,15 @@ buildscript {
   dependencies {
     classpath "com.android.tools.build:gradle:${android_version}"
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlin_version}"
-    classpath 'com.bhb.android.plugin:componentization:0.4.10.4'
+    // classpath 'com.bhb.android.plugin:componentization:0.4.10.5'
+    classpath 'com.sensorsdata.analytics.android:android-gradle-plugin2:3.2.12'
   }
 }
 
 apply plugin: 'componentization'
 
 componentization {
-  debugMode = false
+  debugMode = true
   incremental = true
   resourcesDir = "build/abccc/out"
   includeModules = ['^libra.*', '^viewpager.*']

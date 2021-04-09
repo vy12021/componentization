@@ -1,9 +1,31 @@
 import com.android.build.gradle.AppExtension
-import com.android.build.gradle.BaseExtension
 
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
+apply plugin: 'com.sensorsdata.analytics.android'
+
+sensorsAnalytics {
+  // 调试模式开关
+  debug = true
+  disableJar = false
+  // 白名单列表
+  include = []
+  lambdaEnabled = false
+  // 禁止替换WebView
+  autoHandleWebView = true
+  sdk {
+    disableIMEI = false
+    disableLog = false
+    disableJsInterface = false
+    disableAndroidID = false
+    disableMacAddress = true
+    // 获取运营商信息开关
+    disableCarrier = false
+  }
+  // 黑名单开关
+  useInclude = false
+}
 
 android {
 
@@ -14,6 +36,7 @@ afterEvaluate {
 }
 
 dependencies {
-  /*annotationProcessor project(':compiler')
-  kapt project(':compiler')*/
+  annotationProcessor project(':compiler')
+  kapt project(':compiler')
+  implementation 'com.sensorsdata.analytics.android:SensorsAnalyticsSDK:4.3.4'
 }
