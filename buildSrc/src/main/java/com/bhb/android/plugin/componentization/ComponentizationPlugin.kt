@@ -6,7 +6,6 @@ import com.android.build.gradle.LibraryExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.plugin.KaptExtension
-import java.io.File
 import java.util.*
 
 /**
@@ -31,7 +30,7 @@ class ComponentizationPlugin: Plugin<Project> {
 
   private val properties by lazy {
     Properties().apply {
-      Thread.currentThread().contextClassLoader.getResourceAsStream("artifact.properties")!!.run {
+      Thread.currentThread().contextClassLoader.getResourceAsStream("artifact.properties")?.run {
         load(this)
       }
     }
@@ -63,13 +62,14 @@ class ComponentizationPlugin: Plugin<Project> {
       it.requireAndroidExt().apply {
         println("Project[${it.name}].registerTransform(${config})")
         registerTransform(ComponentScanner(it))
-        injectDependency(project)
-        injectCompileOptions(it)
       }
 
       if (!it.isApplicationModule()) {
         return@afterEvaluate
       }
+
+      injectDependency(it)
+      injectCompileOptions(it)
 
       it.eachSubProject { subProject ->
         project.addDependency("implementation", subProject)
@@ -79,15 +79,39 @@ class ComponentizationPlugin: Plugin<Project> {
         }
       }
 
-      val propertiesFile = File(
-              project.rootProject.file(config.resourcesDir), REGISTER_FILE_NAME)
-      if (propertiesFile.exists()) {
-        it.getBuildNames().forEach { buildName ->
-          propertiesFile.copyTo(
-                  it.requireApplicationProject().file(RESOURCES_OUTPUT_PREFIX)
-                          .resolve(buildName).resolve("out")
-                          .resolve(REGISTER_FILE_NAME), true)
+      it.tasks.register("syncProperties") { task ->
+        task.doLast { _ ->
+          migrateProperties(it)
         }
+      }
+      it.tasks.whenTaskAdded { task ->
+        if (task.name.endsWith("JavaResource")) {
+          println("Task>>>>>>>>>>>>>>>${task.name}.mustRunAfter")
+          task.mustRunAfter("syncProperties")
+        }
+      }
+
+      it.afterEvaluate {_ ->
+        // 同步module配置过程同步属性文件
+        migrateProperties(it)
+      }
+    }
+  }
+
+  private fun migrateProperties(project: Project) {
+    // 同步module配置过程同步属性文件
+    project.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let {rootFile ->
+      if (!rootFile.exists()) {
+        return@let
+      }
+      project.getBuildNames().forEach { buildName ->
+        project.file(RESOURCES_OUTPUT_PREFIX)
+                .resolve(buildName).resolve("out")
+                .resolve(REGISTER_FILE_NAME).let {buildFile ->
+                  if (!buildFile.exists()) {
+                    rootFile.copyTo(buildFile)
+                  }
+                }
       }
     }
   }
@@ -121,6 +145,9 @@ class ComponentizationPlugin: Plugin<Project> {
           resourcesDirs.append(",")
         }
       }
+    }
+    if (config.debugMode) {
+      println("Project[${project.name}].injectCompileOptions--->${resourcesDirs}")
     }
     val options = mapOf(
             OPTION_DEBUG_MODE to config.debugMode.toString(),
@@ -157,11 +184,11 @@ class ComponentizationPlugin: Plugin<Project> {
 }
 
 internal fun Project.getBuildNames(): Set<String> {
-  return (requireApplicationProject().requireAndroidExt() as AppExtension).let {
-    if (it.applicationVariants.isNotEmpty()) {
-      it.applicationVariants.map { it.name }
+  return (requireApplicationProject().requireAndroidExt() as AppExtension).let {androidExt ->
+    if (androidExt.applicationVariants.isNotEmpty()) {
+      androidExt.applicationVariants.map { it.name }
     } else {
-      it.buildTypes.map { it.name }
+      androidExt.buildTypes.map { it.name }
     }
   }.toSet()
 }

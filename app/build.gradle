@@ -29,6 +29,15 @@ sensorsAnalytics {
 
 android {
 
+  flavorDimensions 'Beta'
+
+  productFlavors {
+    Beta {
+      dimension 'Beta'
+
+    }
+  }
+
 }
 
 afterEvaluate {

@@ -22,13 +22,15 @@ class ComponentizationPlugin: Plugin<Project> {
     private const val OPTION_RESOURCES_DIR = "option.resources.dir"
     private const val OPTION_RESOURCES_OUTPUT_DIR = "option.resources.output.dir"
     private const val RESOURCES_OUTPUT_PREFIX = "build/intermediates/java_res"
+
+    private const val REGISTER_FILE_NAME = "module-register.properties"
   }
 
   private lateinit var config: ComponentizationConfig
 
   private val properties by lazy {
     Properties().apply {
-      Thread.currentThread().contextClassLoader.getResourceAsStream("artifact.properties")!!.run {
+      Thread.currentThread().contextClassLoader.getResourceAsStream("artifact.properties")?.run {
         load(this)
       }
     }
@@ -60,13 +62,13 @@ class ComponentizationPlugin: Plugin<Project> {
       it.requireAndroidExt().apply {
         println("Project[${it.name}].registerTransform(${config})")
         registerTransform(ComponentScanner(it))
-        injectDependency(project)
-        injectCompileOptions(it)
       }
 
       if (!it.isApplicationModule()) {
         return@afterEvaluate
       }
+
+      injectDependency(it)
 
       it.eachSubProject { subProject ->
         project.addDependency("implementation", subProject)
@@ -76,15 +78,23 @@ class ComponentizationPlugin: Plugin<Project> {
         }
       }
 
-      // 注册自动copy注册配置任务，防止有缓存状态导致配置不能正确打包到apk
-      /*it.tasks.register("").configure {
-        it.doFirst {  }
+      it.afterEvaluate {_ ->
+        injectCompileOptions(it)
+        it.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let {rootFile ->
+          if (!rootFile.exists()) {
+            return@let
+          }
+          it.getBuildNames().forEach { buildName ->
+            it.file(RESOURCES_OUTPUT_PREFIX)
+                    .resolve(buildName).resolve("out")
+                    .resolve(REGISTER_FILE_NAME).let {buildFile ->
+                      if (!buildFile.exists()) {
+                        rootFile.copyTo(buildFile)
+                      }
+                    }
+          }
+        }
       }
-      it.tasks.whenObjectAdded {
-        if (it.name == )
-
-      }*/
-
     }
   }
 
@@ -117,6 +127,9 @@ class ComponentizationPlugin: Plugin<Project> {
           resourcesDirs.append(",")
         }
       }
+    }
+    if (config.debugMode) {
+      println("Project[${project.name}].injectCompileOptions--->${project.getBuildNames()}")
     }
     val options = mapOf(
             OPTION_DEBUG_MODE to config.debugMode.toString(),
@@ -153,11 +166,11 @@ class ComponentizationPlugin: Plugin<Project> {
 }
 
 internal fun Project.getBuildNames(): Set<String> {
-  return (requireApplicationProject().requireAndroidExt() as AppExtension).let {
-    if (it.applicationVariants.isNotEmpty()) {
-      it.applicationVariants.map { it.name }
+  return (requireApplicationProject().requireAndroidExt() as AppExtension).let {androidExt ->
+    if (androidExt.applicationVariants.isNotEmpty()) {
+      androidExt.applicationVariants.map { it.name }
     } else {
-      it.buildTypes.map { it.name }
+      androidExt.buildTypes.map { it.name }
     }
   }.toSet()
 }

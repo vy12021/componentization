@@ -482,9 +482,10 @@ class ComponentScanner(private val project: Project): Transform() {
         }
         apiTypes.forEach {apiType ->
           registerMetas.put(apiType, serviceType)?.let {lastService ->
-            throw IllegalArgumentException(
-                    "接口 [${apiType}] 发现重复实现: \n" +
-                    "$serviceType, $lastService")
+            if (serviceType != lastService) {
+              throw IllegalArgumentException(
+                      "接口 [${apiType}] 发现重复实现: \n" + "$serviceType, $lastService")
+            }
           }
         }
       }

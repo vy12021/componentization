@@ -134,11 +134,13 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     rootDirectory = options.get(OPTION_ROOT_MODULE_DIR);
     applicationDirectory = options.get(OPTION_APP_MODULE_DIR);
     resourcesDirectory = options.get(OPTION_RESOURCES_DIR);
-    resourcesOutputDirectories = options.get(OPTION_RESOURCES_OUTPUT_DIR).split(",\\s*");
+    // resourcesOutputDirectories = options.get(OPTION_RESOURCES_OUTPUT_DIR).split(",\\s*");
     logger.printMessage(Diagnostic.Kind.WARNING,
             "options--->{moduleName: " + moduleName
                     + ", applicationDirectory: " + applicationDirectory
-                    + ", resourcesDirectory: " + Arrays.toString(resourcesOutputDirectories) + "}\n ");
+                    + ", resourcesDirectory: " + applicationDirectory
+                    + ", resourcesOutputDirectories: "
+                    + Arrays.toString(resourcesOutputDirectories) + "}\n ");
     try {
       trees = Trees.instance(processingEnv);
     } catch (IllegalArgumentException ignored) {
@@ -162,7 +164,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   }
 
   @Override public Set<String> getSupportedOptions() {
-    Set<String> options = new LinkedHashSet<>(4);
+    Set<String> options = new LinkedHashSet<>(7);
     if (trees != null) {
       options.add(OPTION_DEBUG_MODE);
       options.add(OPTION_ROOT_MODULE_DIR);
@@ -282,9 +284,9 @@ public final class ComponentizationProcessor extends AbstractProcessor {
         properties.store(writer, "module registers");
       }
     } finally {
-      for (String directory : resourcesOutputDirectories) {
+      /*for (String directory : resourcesOutputDirectories) {
         copyFiles(propFile, new File(applicationDirectory, directory));
-      }
+      }*/
       lockFile.delete();
     }
   }
@@ -601,19 +603,6 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private TypeName getRawType(TypeName typeName) {
     return typeName instanceof ParameterizedTypeName
             ? ((ParameterizedTypeName) typeName).rawType : typeName;
-  }
-
-  /**
-   * 尝试进行文件锁处理
-   */
-  private synchronized void lockWithFile(String fileName, Runnable closure) throws Exception {
-    File lockFile = new File(applicationDirectory, fileName);
-    while (lockFile.exists()) {
-      Thread.sleep(10);
-    }
-    lockFile.createNewFile();
-    closure.run();
-    lockFile.delete();
   }
 
 }
