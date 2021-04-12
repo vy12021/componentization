@@ -96,17 +96,9 @@ public final class ComponentizationProcessor extends AbstractProcessor {
    */
   private static final String OPTION_ROOT_MODULE_DIR = "option.root.module.dir";
   /**
-   * 应用入口模块目录
-   */
-  private static final String OPTION_APP_MODULE_DIR = "option.app.module.dir";
-  /**
    * 资源目录，相对于{@link #OPTION_ROOT_MODULE_DIR}
    */
   private static final String OPTION_RESOURCES_DIR = "option.resources.dir";
-  /**
-   * 资源的最终输出目录，是一个用,分隔的目录列表，需要全部进行copy一份 {@link #OPTION_APP_MODULE_DIR}
-   */
-  private static final String OPTION_RESOURCES_OUTPUT_DIR = "option.resources.output.dir";
 
   private Types typeUtils;
   private Filer filer;
@@ -132,9 +124,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
             && Boolean.parseBoolean(options.get(OPTION_DEBUG_MODE));
     moduleName = options.get(OPTION_MODULE_NAME);
     rootDirectory = options.get(OPTION_ROOT_MODULE_DIR);
-    applicationDirectory = options.get(OPTION_APP_MODULE_DIR);
     resourcesDirectory = options.get(OPTION_RESOURCES_DIR);
-    // resourcesOutputDirectories = options.get(OPTION_RESOURCES_OUTPUT_DIR).split(",\\s*");
     logger.printMessage(Diagnostic.Kind.WARNING,
             "options--->{moduleName: " + moduleName
                     + ", applicationDirectory: " + applicationDirectory
@@ -168,10 +158,8 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     if (trees != null) {
       options.add(OPTION_DEBUG_MODE);
       options.add(OPTION_ROOT_MODULE_DIR);
-      options.add(OPTION_APP_MODULE_DIR);
       options.add(OPTION_MODULE_NAME);
       options.add(OPTION_RESOURCES_DIR);
-      options.add(OPTION_RESOURCES_OUTPUT_DIR);
       options.add(IncrementalAnnotationProcessorType.ISOLATING.getProcessorOption());
     }
     return options;
@@ -284,48 +272,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
         properties.store(writer, "module registers");
       }
     } finally {
-      /*for (String directory : resourcesOutputDirectories) {
-        copyFiles(propFile, new File(applicationDirectory, directory));
-      }*/
       lockFile.delete();
-    }
-  }
-
-  private void copyFiles(File origin, File... directories) throws IOException {
-    if (directories.length == 0) {
-      return;
-    }
-    File[] dsts = new File[directories.length];
-    FileOutputStream[] foss = new FileOutputStream[dsts.length];
-    for (int i = 0; i < directories.length; i++) {
-      File dir = directories[i];
-      dir.mkdirs();
-      File dst = new File(dir, origin.getName());
-      dsts[i] = dst;
-      if (!dst.exists()) {
-        dsts[i].createNewFile();
-      }
-      foss[i] = new FileOutputStream(dst);
-    }
-    try (FileInputStream fis = new FileInputStream(origin)) {
-      byte[] buffer = new byte[4096];
-      int len;
-      while (-1 != (len = fis.read(buffer))) {
-        for (FileOutputStream fos : foss) {
-          if (null != fos) {
-            fos.write(buffer, 0, len);
-          }
-        }
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-    } finally {
-      for (FileOutputStream fos : foss) {
-        if (null != fos) {
-          fos.flush();
-          fos.close();
-        }
-      }
     }
   }
 

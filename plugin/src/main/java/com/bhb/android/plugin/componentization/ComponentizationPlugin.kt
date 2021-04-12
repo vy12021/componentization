@@ -69,6 +69,7 @@ class ComponentizationPlugin: Plugin<Project> {
       }
 
       injectDependency(it)
+      injectCompileOptions(it)
 
       it.eachSubProject { subProject ->
         project.addDependency("implementation", subProject)
@@ -79,21 +80,39 @@ class ComponentizationPlugin: Plugin<Project> {
       }
 
       it.afterEvaluate {_ ->
-        injectCompileOptions(it)
-        it.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let {rootFile ->
-          if (!rootFile.exists()) {
-            return@let
-          }
-          it.getBuildNames().forEach { buildName ->
-            it.file(RESOURCES_OUTPUT_PREFIX)
-                    .resolve(buildName).resolve("out")
-                    .resolve(REGISTER_FILE_NAME).let {buildFile ->
-                      if (!buildFile.exists()) {
-                        rootFile.copyTo(buildFile)
-                      }
-                    }
+        // 同步module配置过程同步属性文件
+        migrateProperties(it)
+        // 注册合并java资源任务
+        it.getBuildNames().forEach { buildName ->
+          it.tasks.apply {
+            register("syncProperties$buildName") { task ->
+              task.doLast { _ ->
+                migrateProperties(it)
+              }
+            }
+            findByName("merge${buildName}JavaResource")?.apply {
+              dependsOn("syncProperties$buildName")
+            }
           }
         }
+      }
+    }
+  }
+
+  private fun migrateProperties(project: Project) {
+    // 同步module配置过程同步属性文件
+    project.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let {rootFile ->
+      if (!rootFile.exists()) {
+        return@let
+      }
+      project.getBuildNames().forEach { buildName ->
+        project.file(RESOURCES_OUTPUT_PREFIX)
+            .resolve(buildName).resolve("out")
+            .resolve(REGISTER_FILE_NAME).let {buildFile ->
+              if (!buildFile.exists()) {
+                rootFile.copyTo(buildFile)
+              }
+            }
       }
     }
   }
@@ -129,15 +148,15 @@ class ComponentizationPlugin: Plugin<Project> {
       }
     }
     if (config.debugMode) {
-      println("Project[${project.name}].injectCompileOptions--->${project.getBuildNames()}")
+      println("Project[${project.name}].injectCompileOptions--->${resourcesDirs}")
     }
     val options = mapOf(
-            OPTION_DEBUG_MODE to config.debugMode.toString(),
-            OPTION_ROOT_MODULE_DIR to project.rootProject.projectDir.absolutePath,
-            OPTION_APP_MODULE_DIR to project.requireApplicationProject().projectDir.absolutePath,
-            OPTION_MODULE_NAME to project.name,
-            OPTION_RESOURCES_DIR to config.resourcesDir,
-            OPTION_RESOURCES_OUTPUT_DIR to resourcesDirs.toString())
+        OPTION_DEBUG_MODE to config.debugMode.toString(),
+        OPTION_ROOT_MODULE_DIR to project.rootProject.projectDir.absolutePath,
+        OPTION_APP_MODULE_DIR to project.requireApplicationProject().projectDir.absolutePath,
+        OPTION_MODULE_NAME to project.name,
+        OPTION_RESOURCES_DIR to config.resourcesDir,
+        OPTION_RESOURCES_OUTPUT_DIR to resourcesDirs.toString())
     project.requireAndroidExt().defaultConfig.javaCompileOptions {
       annotationProcessorOptions {
         arguments.putAll(options)
@@ -206,7 +225,7 @@ internal fun Project.getComponentConfig(): ComponentizationConfig {
     // 先查找，如果没有找到再创建，如果创建失败
     rootProject.extensions.let {
       it.findByType(ComponentizationConfig::class.java)
-              ?: it.create("componentization", ComponentizationConfig::class.java)
+          ?: it.create("componentization", ComponentizationConfig::class.java)
     }
   } catch (e: Exception) {
     e.printStackTrace()

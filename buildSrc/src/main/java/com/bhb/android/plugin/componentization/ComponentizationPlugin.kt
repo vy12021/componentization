@@ -79,21 +79,22 @@ class ComponentizationPlugin: Plugin<Project> {
         }
       }
 
-      it.tasks.register("syncProperties") { task ->
-        task.doLast { _ ->
-          migrateProperties(it)
-        }
-      }
-      it.tasks.whenTaskAdded { task ->
-        if (task.name.endsWith("JavaResource")) {
-          println("Task>>>>>>>>>>>>>>>${task.name}.mustRunAfter")
-          task.mustRunAfter("syncProperties")
-        }
-      }
-
       it.afterEvaluate {_ ->
         // 同步module配置过程同步属性文件
         migrateProperties(it)
+        // 注册合并java资源任务
+        it.getBuildNames().forEach { buildName ->
+          it.tasks.apply {
+            register("syncProperties$buildName") { task ->
+              task.doLast { _ ->
+                migrateProperties(it)
+              }
+            }
+            findByName("merge${buildName}JavaResource")?.apply {
+              dependsOn("syncProperties$buildName")
+            }
+          }
+        }
       }
     }
   }
