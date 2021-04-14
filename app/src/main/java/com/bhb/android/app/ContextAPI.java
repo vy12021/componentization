@@ -3,7 +3,7 @@ package com.bhb.android.app;
 import android.app.Application;
 
 import com.bhb.android.componentization.API;
-import com.bhb.android.componentization.Api;
+import com.bhb.android.componentization.annotation.Api;
 
 @Api(singleton = true)
 public interface ContextAPI extends API {

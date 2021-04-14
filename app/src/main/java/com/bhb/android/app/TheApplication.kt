@@ -3,9 +3,9 @@ package com.bhb.android.app
 import android.app.Application
 import android.content.Context
 import android.widget.Toast
-import com.bhb.android.componentization.AutoWired
-import com.bhb.android.componentization.Provider
-import com.bhb.android.componentization.Service
+import com.bhb.android.componentization.annotation.AutoWired
+import com.bhb.android.componentization.annotation.Provider
+import com.bhb.android.componentization.annotation.Service
 
 @Service
 class TheApplication: Application(), ContextAPI {

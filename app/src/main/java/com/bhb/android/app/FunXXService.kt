@@ -2,8 +2,8 @@ package com.bhb.android.app
 
 import android.content.Context
 import android.widget.Toast
-import com.bhb.android.componentization.AutoWired
-import com.bhb.android.componentization.Service
+import com.bhb.android.componentization.annotation.AutoWired
+import com.bhb.android.componentization.annotation.Service
 import com.bhb.android.library.AppAPI
 
 @Service

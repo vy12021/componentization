@@ -1,7 +1,7 @@
 package com.bhb.android.library
 
 import android.content.Context
-import com.bhb.android.componentization.AutoWired
+import com.bhb.android.componentization.annotation.AutoWired
 
 class UsedWithContext(context: Context) {
 

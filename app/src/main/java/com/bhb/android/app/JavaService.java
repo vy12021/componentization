@@ -1,6 +1,6 @@
 package com.bhb.android.app;
 
-import com.bhb.android.componentization.Service;
+import com.bhb.android.componentization.annotation.Service;
 
 import java.util.List;
 

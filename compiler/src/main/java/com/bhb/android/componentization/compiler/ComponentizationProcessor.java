@@ -1,5 +1,7 @@
-package com.bhb.android.componentization;
+package com.bhb.android.componentization.compiler;
 
+import com.bhb.android.componentization.annotation.Api;
+import com.bhb.android.componentization.annotation.Service;
 import com.google.auto.common.SuperficialValidation;
 import com.google.auto.service.AutoService;
 import com.squareup.javapoet.AnnotationSpec;
@@ -30,7 +32,6 @@ import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -39,7 +40,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -81,7 +82,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private static final ClassName LazyDelegateImplType = ClassName.get(
           PACKAGE_SPACE, "LazyDelegateImpl");
   private static final ClassName AnnotationMetaType = ClassName.get(
-          PACKAGE_SPACE, "Meta");
+          PACKAGE_SPACE + ".annotation", "Meta");
 
   /**
    * 模块名注解处理器选项，值为boolean表达调试开关是否开启
@@ -415,7 +416,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private List<MethodSpec> generateMethod(Type service, Type api, String delegateField) {
     List<MethodSpec> methodSpecs = new ArrayList<>();
     // 添加接口方法实现
-    Iterator<Symbol> membersIterator = api.tsym.members().getElements().iterator();
+    Iterator<Symbol> membersIterator = api.tsym.members().getSymbols().iterator();
     Symbol member;
     while (membersIterator.hasNext()) {
       member = membersIterator.next();
@@ -496,7 +497,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     String apiMethodName = apiMethod.getSimpleName().toString();
     List<Symbol.VarSymbol> apiParams = apiMethod.getParameters();
     Type apiReturnType = apiMethod.getReturnType();
-    Iterator<Symbol> memberIterator = service.asElement().members().getElements().iterator();
+    Iterator<Symbol> memberIterator = service.asElement().members().getSymbols().iterator();
     Symbol member;
     while (memberIterator.hasNext()) {
       member = memberIterator.next();

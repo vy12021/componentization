@@ -1,5 +1,7 @@
 package com.bhb.android.componentization;
 
+import com.bhb.android.componentization.annotation.Api;
+
 import java.io.Serializable;
 
 @Api

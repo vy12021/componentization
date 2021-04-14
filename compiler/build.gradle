@@ -1,5 +1,3 @@
-import org.gradle.internal.jvm.Jvm
-
 apply plugin: 'java-library'
 
 java {
@@ -7,14 +5,22 @@ java {
   targetCompatibility = JavaVersion.VERSION_1_8
 }
 
+// https://docs.gradle.org/current/dsl/org.gradle.api.tasks.compile.JavaCompile.html
+tasks.named('compileJava') {
+  // options.compilerArgs += ['--add-modules', 'jdk.compiler']
+  modularity.inferModulePath = true
+  // use the project's version or define one directly
+  // options.javaModuleVersion = provider { project.version }
+}
+
 
 dependencies {
   implementation project(':annotation')
   implementation 'com.squareup:javapoet:1.13.0'
   implementation 'com.google.auto:auto-common:0.10'
+  implementation 'org.jetbrains:annotations:15.0'
   compileOnly 'com.google.auto.service:auto-service:1.0-rc7'
   annotationProcessor 'com.google.auto.service:auto-service:1.0-rc7'
-  compileOnly files(Jvm.current().getToolsJar())
 
   implementation 'net.ltgt.gradle.incap:incap:0.2'
   annotationProcessor 'net.ltgt.gradle.incap:incap-processor:0.2'

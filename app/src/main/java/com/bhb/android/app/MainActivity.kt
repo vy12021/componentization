@@ -3,7 +3,7 @@ package com.bhb.android.app
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import com.bhb.android.componentization.AutoWired
+import com.bhb.android.componentization.annotation.AutoWired
 import com.bhb.android.library.AppAPI
 
 class MainActivity: AppCompatActivity() {

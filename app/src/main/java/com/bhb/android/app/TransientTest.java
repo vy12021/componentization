@@ -2,7 +2,7 @@ package com.bhb.android.app;
 
 import android.content.Context;
 
-import com.bhb.android.componentization.AutoWired;
+import com.bhb.android.componentization.annotation.AutoWired;
 
 class TransientTest {
 

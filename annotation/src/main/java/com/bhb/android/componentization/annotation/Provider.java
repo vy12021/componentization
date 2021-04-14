@@ -1,4 +1,4 @@
-package com.bhb.android.componentization;
+package com.bhb.android.componentization.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

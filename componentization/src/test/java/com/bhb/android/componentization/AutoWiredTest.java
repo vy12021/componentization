@@ -1,5 +1,6 @@
 package com.bhb.android.componentization;
 
+import com.bhb.android.componentization.compiler.ComponentizationProcessor;
 import com.google.testing.compile.JavaFileObjects;
 
 import org.junit.Test;

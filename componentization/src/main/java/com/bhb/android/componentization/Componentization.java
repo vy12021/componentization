@@ -2,6 +2,10 @@ package com.bhb.android.componentization;
 
 import android.util.Log;
 
+import com.bhb.android.componentization.annotation.Api;
+import com.bhb.android.componentization.annotation.Provider;
+import com.bhb.android.componentization.annotation.Service;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;

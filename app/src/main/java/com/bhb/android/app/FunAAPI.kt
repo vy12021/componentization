@@ -1,6 +1,6 @@
 package com.bhb.android.app
 
-import com.bhb.android.componentization.Api
+import com.bhb.android.componentization.annotation.Api
 
 @Api
 interface FunAAPI: AbstractAPI<String> {

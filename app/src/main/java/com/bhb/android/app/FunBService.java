@@ -1,6 +1,6 @@
 package com.bhb.android.app;
 
-import com.bhb.android.componentization.Service;
+import com.bhb.android.componentization.annotation.Service;
 
 @Service
 public class FunBService implements FunBAPI<String> {
