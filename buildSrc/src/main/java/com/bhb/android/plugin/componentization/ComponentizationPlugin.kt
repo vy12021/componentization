@@ -3,6 +3,7 @@ package com.bhb.android.plugin.componentization
 import com.android.build.gradle.AppExtension
 import com.android.build.gradle.BaseExtension
 import com.android.build.gradle.LibraryExtension
+import com.bhb.android.plugin.componentization.ComponentizationConfig.PROPERTY_MODULE
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.jetbrains.kotlin.gradle.plugin.KaptExtension
@@ -18,9 +19,7 @@ class ComponentizationPlugin: Plugin<Project> {
     private const val OPTION_DEBUG_MODE = "option.debug.enable"
     private const val OPTION_MODULE_NAME = "option.module.name"
     private const val OPTION_ROOT_MODULE_DIR = "option.root.module.dir"
-    private const val OPTION_APP_MODULE_DIR = "option.app.module.dir"
     private const val OPTION_RESOURCES_DIR = "option.resources.dir"
-    private const val OPTION_RESOURCES_OUTPUT_DIR = "option.resources.output.dir"
     private const val RESOURCES_OUTPUT_PREFIX = "build/intermediates/java_res"
 
     private const val REGISTER_FILE_NAME = "module-register.properties"
@@ -37,9 +36,7 @@ class ComponentizationPlugin: Plugin<Project> {
   }
 
   private val Group by lazy { properties.getProperty("implementation-group", "") }
-
   private val Version by lazy { properties.getProperty("implementation-version", "") }
-
   private val annotationConfig = "${Group}:compiler:${Version}"
   private val runtimeConfig = "${Group}:componentization:${Version}"
 
@@ -79,19 +76,18 @@ class ComponentizationPlugin: Plugin<Project> {
         }
       }
 
-      it.afterEvaluate {_ ->
-        // 同步module配置过程同步属性文件
-        migrateProperties(it)
+      it.gradle.taskGraph.whenReady { _ ->
         // 注册合并java资源任务
         it.getBuildNames().forEach { buildName ->
-          it.tasks.apply {
-            register("syncProperties$buildName") { task ->
-              task.doLast { _ ->
-                migrateProperties(it)
-              }
+          it.tasks.findByName("merge${buildName}JavaResource")?.apply {
+            doFirst { _ ->
+              migrateProperties(it)
             }
-            findByName("merge${buildName}JavaResource")?.apply {
-              dependsOn("syncProperties$buildName")
+            if (config.incremental) {
+              // 永远执行
+              setOnlyIf { true }
+              // 不做缓存
+              outputs.upToDateWhen { false }
             }
           }
         }
@@ -103,29 +99,20 @@ class ComponentizationPlugin: Plugin<Project> {
     // 同步module配置过程同步属性文件
     project.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let {rootFile ->
       if (!rootFile.exists()) {
+        println("migrateProperties: $rootFile is not exists...")
         return@let
       }
       project.getBuildNames().forEach { buildName ->
         project.file(RESOURCES_OUTPUT_PREFIX)
                 .resolve(buildName).resolve("out")
                 .resolve(REGISTER_FILE_NAME).let {buildFile ->
-                  if (!buildFile.exists()) {
-                    rootFile.copyTo(buildFile)
-                  }
+                  rootFile.copyTo(buildFile, true)
+                  println("migrateProperties: $rootFile to $buildFile ...")
                 }
       }
     }
   }
 
-  private fun Project.eachSubProject(iterator: (subProject: Project) -> Unit) {
-    subProjects { it.isApplicationModule() || matchProject(config.includeModules, it) }.forEach(iterator)
-  }
-
-  private fun Project.isApplicationModule() = isApplication() || config.applicationModule == name
-
-  /**
-   * 注入必要依赖
-   */
   private fun injectDependency(project: Project) {
     /*project.addDependency("implementation", runtimeConfig)
     project.addProcessor(annotationConfig)*/
@@ -135,28 +122,14 @@ class ComponentizationPlugin: Plugin<Project> {
    * 注入编译选项，如果是入口Project则必须在evaluated之前配置
    */
   private fun injectCompileOptions(project: Project) {
-    val resourcesDirs = StringBuilder()
-    project.getBuildNames().apply {
-      forEachIndexed { index, buildName ->
-        resourcesDirs.apply {
-          append(RESOURCES_OUTPUT_PREFIX).append("/")
-          append(buildName).append("/").append("out")
-        }
-        if (index < size - 1) {
-          resourcesDirs.append(",")
-        }
-      }
-    }
-    if (config.debugMode) {
-      println("Project[${project.name}].injectCompileOptions--->${resourcesDirs}")
-    }
     val options = mapOf(
             OPTION_DEBUG_MODE to config.debugMode.toString(),
-            OPTION_ROOT_MODULE_DIR to project.rootProject.projectDir.absolutePath,
-            OPTION_APP_MODULE_DIR to project.requireApplicationProject().projectDir.absolutePath,
             OPTION_MODULE_NAME to project.name,
-            OPTION_RESOURCES_DIR to config.resourcesDir,
-            OPTION_RESOURCES_OUTPUT_DIR to resourcesDirs.toString())
+            OPTION_ROOT_MODULE_DIR to project.rootProject.projectDir.absolutePath,
+            OPTION_RESOURCES_DIR to config.resourcesDir)
+    if (config.debugMode) {
+      println("Project[${project.name}].injectCompileOptions--->${options}")
+    }
     project.requireAndroidExt().defaultConfig.javaCompileOptions {
       annotationProcessorOptions {
         arguments.putAll(options)
@@ -172,8 +145,8 @@ class ComponentizationPlugin: Plugin<Project> {
   }
 
   private fun matchProject(includeModules: Array<String>, subProject: Project): Boolean {
-    if (subProject.hasProperty(ComponentizationConfig.PROPERTY_MODULE)) {
-      (subProject.findProperty(ComponentizationConfig.PROPERTY_MODULE) as? String)?.toBoolean()?.let {
+    if (subProject.hasProperty(PROPERTY_MODULE)) {
+      (subProject.findProperty(PROPERTY_MODULE) as? String)?.toBoolean()?.let {
         if (it) return true
       }
     }
@@ -181,6 +154,14 @@ class ComponentizationPlugin: Plugin<Project> {
       subProject.name == moduleName || subProject.name.matches(moduleName.toRegex())
     } != null
   }
+
+  private fun Project.eachSubProject(iterator: (subProject: Project) -> Unit) {
+    subProjects {
+      it.isApplicationModule() || matchProject(config.includeModules, it)
+    }.forEach(iterator)
+  }
+
+  private fun Project.isApplicationModule() = isApplication() || config.applicationModule == name
 
 }
 

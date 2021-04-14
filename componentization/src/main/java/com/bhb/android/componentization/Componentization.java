@@ -273,7 +273,6 @@ public final class Componentization {
   static {
     try {
       for (Class<? extends ComponentRegister> registerClazz : loadModuleRegisters()) {
-        Log.e(TAG, "register from: " + registerClazz.getName());
         register(registerClazz);
       }
     } catch (Exception e) {
@@ -285,8 +284,7 @@ public final class Componentization {
    * 从注解处理器生成的组件注册属性文件中反射载入注册类
    * @return 返回
    */
-  private static Set<Class<? extends ComponentRegister>> loadModuleRegisters()
-          throws ComponentException {
+  private static Set<Class<? extends ComponentRegister>> loadModuleRegisters() {
     Log.e(TAG, "loadModuleRegisters....");
     InputStream propertyStream = Thread.currentThread().getContextClassLoader()
             .getResourceAsStream("module-register.properties");
@@ -312,7 +310,7 @@ public final class Componentization {
         try {
           registers.add(loadClass(clazzName));
         } catch (Exception e) {
-          e.printStackTrace();
+          Log.e(TAG, "loadClass [" + clazzName + "] failed");
         }
       }
     }

@@ -109,9 +109,7 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   private boolean debugEnabled;
   private String moduleName;
   private String rootDirectory;
-  private String applicationDirectory;
   private String resourcesDirectory;
-  private String[] resourcesOutputDirectories;
 
   @Override
   public synchronized void init(ProcessingEnvironment env) {
@@ -126,11 +124,11 @@ public final class ComponentizationProcessor extends AbstractProcessor {
     rootDirectory = options.get(OPTION_ROOT_MODULE_DIR);
     resourcesDirectory = options.get(OPTION_RESOURCES_DIR);
     logger.printMessage(Diagnostic.Kind.WARNING,
-            "options--->{moduleName: " + moduleName
-                    + ", applicationDirectory: " + applicationDirectory
-                    + ", resourcesDirectory: " + applicationDirectory
-                    + ", resourcesOutputDirectories: "
-                    + Arrays.toString(resourcesOutputDirectories) + "}\n ");
+            "options--->{"
+                    + "debuggable: " + debugEnabled
+                    + ", moduleName: " + moduleName
+                    + ", rootDirectory: " + rootDirectory
+                    + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
     try {
       trees = Trees.instance(processingEnv);
     } catch (IllegalArgumentException ignored) {
