@@ -1,18 +1,10 @@
 apply plugin: 'java-library'
 
-java {
-  sourceCompatibility = JavaVersion.VERSION_1_8
-  targetCompatibility = JavaVersion.VERSION_1_8
+extraJavaModuleInfo {
+  module('auto-common-0.10.jar', 'com.google.auto.common', '0.10')
+  module('incap-0.2.jar', 'net.ltgt.gradle.incap', '0.2')
+  module('annotations-15.0.jar', 'org.jetbrains.annotations', '15.0')
 }
-
-// https://docs.gradle.org/current/dsl/org.gradle.api.tasks.compile.JavaCompile.html
-tasks.named('compileJava') {
-  // options.compilerArgs += ['--add-modules', 'jdk.compiler']
-  modularity.inferModulePath = true
-  // use the project's version or define one directly
-  // options.javaModuleVersion = provider { project.version }
-}
-
 
 dependencies {
   implementation project(':annotation')

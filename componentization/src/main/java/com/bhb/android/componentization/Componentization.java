@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 
@@ -35,7 +36,8 @@ public final class Componentization {
   /**
    * 全包名
    */
-  private static final String PACKAGE = Componentization.class.getPackage().getName();
+  private static final String PACKAGE =
+          Objects.requireNonNull(Componentization.class.getPackage()).getName();
 
   /**
    * 收集到的组件注册信息
@@ -155,12 +157,14 @@ public final class Componentization {
               ? type : (Class<T>) sComponentProvider.get(type);
       if (null == type) {
         Api apiAnnotation = apiType.getAnnotation(Api.class);
+        assert apiAnnotation != null;
         if (apiAnnotation.dynamic()) {
           Log.w(TAG, "动态组件[" + apiType.getCanonicalName() + "]没有Service实现，暂时忽略");
           return (T) Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(),
                   new Class[]{apiType}, sDynamicHandler);
         }
       }
+      assert type != null;
       Class<? extends LazyDelegate<T>> lazyClazz
               = loadClass(PACKAGE + "." + type.getSimpleName() + LazyDelegate.SUFFIX);
       return (T) lazyClazz.newInstance();
@@ -230,7 +234,8 @@ public final class Componentization {
         throw new ComponentException("对于Service类" + service.getName()
                 + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"不能有参数");
       }
-      if (method.getReturnType() == null || !service.isAssignableFrom(method.getReturnType())) {
+      method.getReturnType();
+      if (!service.isAssignableFrom(method.getReturnType())) {
         throw new ComponentException("对于Service类" + service.getName()
                 + "而言，被@Provider标记为服务提供者方法\"" + method.getName() + "\"返回类型不兼容");
       }
@@ -265,7 +270,8 @@ public final class Componentization {
     } catch (ClassNotFoundException e) {
       e.printStackTrace();
       try {
-        clazz = (Class<T>) Thread.currentThread().getContextClassLoader().loadClass(className);
+        clazz = (Class<T>) Objects.requireNonNull(Thread.currentThread().getContextClassLoader())
+                .loadClass(className);
       } catch (Exception e1) {
         Log.e(TAG, Log.getStackTraceString(e1));
         throw new ComponentException(e1.getMessage(), e1.getCause());
@@ -290,7 +296,8 @@ public final class Componentization {
    */
   private static Set<Class<? extends ComponentRegister>> loadModuleRegisters() {
     Log.e(TAG, "loadModuleRegisters....");
-    InputStream propertyStream = Thread.currentThread().getContextClassLoader()
+    InputStream propertyStream =
+            Objects.requireNonNull(Thread.currentThread().getContextClassLoader())
             .getResourceAsStream("module-register.properties");
     if (null == propertyStream) {
       Log.e(TAG, "loadModuleRegisters failed, properties file not found");

@@ -3,6 +3,7 @@ package com.bhb.android.componentization;
 import java.io.Serializable;
 
 class TestService implements TestAPI {
+
   @Override
   public <T extends Serializable> T doSomething(T p) {
     return null;
@@ -12,4 +13,5 @@ class TestService implements TestAPI {
   public <V extends Serializable> Boolean get(V input, Integer number) {
     return true;
   }
+
 }

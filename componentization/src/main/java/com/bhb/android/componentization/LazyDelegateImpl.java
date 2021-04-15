@@ -1,6 +1,7 @@
 package com.bhb.android.componentization;
 
 import java.lang.reflect.ParameterizedType;
+import java.util.Objects;
 
 /**
  * 这样的空构造是为了反射到实际类型参数，具体使用的地方构造一个匿名类来保留类型信息
@@ -15,8 +16,8 @@ abstract class LazyDelegateImpl<C extends API> implements LazyDelegate<C> {
 
   @SuppressWarnings("unchecked")
   private Class<C> getAPIClass() {
-    return (Class<C>) ((ParameterizedType) getClass()
-        .getGenericSuperclass()).getActualTypeArguments()[0];
+    return (Class<C>) ((ParameterizedType) Objects.requireNonNull(getClass()
+            .getGenericSuperclass())).getActualTypeArguments()[0];
   }
 
   @Override

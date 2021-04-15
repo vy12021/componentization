@@ -3,7 +3,7 @@
 buildscript {
   ext {
     android_version = '7.0.0-alpha12'
-    kotlin_version = '1.4.32'
+    kotlin_version = '1.4.30'
   }
   repositories {
     maven {
@@ -32,7 +32,7 @@ buildscript {
 }
 
 plugins {
-  id 'org.javamodularity.moduleplugin' version '1.7.0' apply false
+  id "de.jjohannes.extra-java-module-info" version "0.6"
 }
 
 apply plugin: 'componentization'
@@ -86,11 +86,17 @@ allprojects {project ->
 
 subprojects {
 
+  apply plugin: 'de.jjohannes.extra-java-module-info'
+
   afterEvaluate {
     def plugins = getPlugins()
     def androidLibrary = plugins.hasPlugin('com.android.library')
     def androidApp = plugins.hasPlugin('com.android.application')
     def kotlinSupport = plugins.hasPlugin('kotlin-kapt')
+
+    java {
+      modularity.inferModulePath = true
+    }
 
     if (!(androidLibrary || androidApp)) {
       sourceCompatibility = rootProject.ext.sourceCompatibilityVersion
@@ -140,13 +146,13 @@ subprojects {
         cruncherEnabled false
       }
       compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility rootProject.ext.sourceCompatibilityVersion
+        targetCompatibility rootProject.ext.sourceCompatibilityVersion
       }
       if (kotlinSupport) {
         kotlinOptions {
           freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
-          jvmTarget = '1.8'
+          jvmTarget = '11'
         }
       }
       lintOptions {
