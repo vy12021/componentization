@@ -1,5 +1,6 @@
 package com.bhb.android.componentization;
 
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.bhb.android.componentization.annotation.Api;
@@ -317,6 +318,9 @@ public final class Componentization {
       String module = key.toString();
       Log.e(TAG, "loadModuleRegisters key: " + module);
       String classes = properties.getProperty(module);
+      if (TextUtils.isEmpty(classes)) {
+        continue;
+      }
       for (String clazzName : classes.split(",\\n*")) {
         try {
           registers.add(loadClass(clazzName));
