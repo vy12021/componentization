@@ -30,7 +30,6 @@ import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -130,6 +129,13 @@ public final class ComponentizationProcessor extends AbstractProcessor {
                     + ", rootDirectory: " + rootDirectory
                     + ", resourcesDirectory: " + resourcesDirectory + "}\n ");
     try {
+      generateRegisterHolder();
+    } catch (Exception e) {
+      e.printStackTrace();
+      logger.printMessage(Diagnostic.Kind.ERROR,
+              "写入注册配置占位模块时异常: " + e.getLocalizedMessage());
+    }
+    try {
       trees = Trees.instance(processingEnv);
     } catch (IllegalArgumentException ignored) {
       try {
@@ -222,6 +228,43 @@ public final class ComponentizationProcessor extends AbstractProcessor {
   }
 
   /**
+   * 写入属性占位key
+   */
+  private synchronized void generateRegisterHolder() throws Exception {
+    Properties properties = new Properties();
+    File propDir = new File(rootDirectory, resourcesDirectory);
+    File propFile = new File(propDir, "module-register.properties");
+    if (!propDir.exists() && !propDir.mkdirs()) {
+      logger.printMessage(Diagnostic.Kind.ERROR, "创建资源文件夹失败: " + propDir + "\n ");
+      return;
+    }
+    if (!propFile.exists() && !propFile.createNewFile()) {
+      logger.printMessage(Diagnostic.Kind.ERROR, "创建注册清单文件失败: " + propFile + "\n ");
+      return;
+    }
+    // 锁文件生成到插件build目录
+    File lockFile = new File(new File(rootDirectory, "build"), "module-register.lock");
+    while (lockFile.exists()) {
+      Thread.sleep(5);
+    }
+    lockFile.createNewFile();
+    try (InputStream is = new FileInputStream(propFile)) {
+      properties.load(is);
+      if (!properties.containsKey(moduleName)) {
+        properties.put(moduleName, "");
+        if (debugEnabled) {
+          logger.printMessage(Diagnostic.Kind.NOTE, "新建模块--->" + moduleName + "\n ");
+        }
+      }
+      try (OutputStream writer = new FileOutputStream(propFile)) {
+        properties.store(writer, "module registers");
+      }
+    } finally {
+      lockFile.delete();
+    }
+  }
+
+  /**
    * 生成模块注册类相关属性缓存，用做增量编译
    */
   private synchronized void generateRegisterProperty() throws Exception {
@@ -251,20 +294,12 @@ public final class ComponentizationProcessor extends AbstractProcessor {
       Thread.sleep(5);
     }
     lockFile.createNewFile();
-    if (debugEnabled) {
-      logger.printMessage(Diagnostic.Kind.NOTE,
-              "准备写入注册清单: " + propFile + "\n ");
-    }
     try (InputStream is = new FileInputStream(propFile)) {
       properties.load(is);
-      if (debugEnabled) {
-        logger.printMessage(Diagnostic.Kind.NOTE,
-                "已有属性--->" + properties.keySet() + "\n ");
-      }
       properties.put(moduleName, classesBuilder.toString());
       if (debugEnabled) {
         logger.printMessage(Diagnostic.Kind.NOTE,
-                "写入属性--->" + moduleName + ": " + classesBuilder.toString() + "\n ");
+                "写入属性--->" + moduleName + ": " + classesBuilder + "\n ");
       }
       try (OutputStream writer = new FileOutputStream(propFile)) {
         properties.store(writer, "module registers");

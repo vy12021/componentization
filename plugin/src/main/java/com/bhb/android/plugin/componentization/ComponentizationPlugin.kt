@@ -6,6 +6,7 @@ import com.android.build.gradle.LibraryExtension
 import com.bhb.android.plugin.componentization.ComponentizationConfig.PROPERTY_MODULE
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
 import org.jetbrains.kotlin.gradle.plugin.KaptExtension
 import java.util.*
 
@@ -46,7 +47,7 @@ class ComponentizationPlugin: Plugin<Project> {
 
     if (project.isRootProject()) {
       project.afterEvaluate {
-        project.eachSubProject { subProject ->
+        project.effectSubModules { subProject ->
           if (config.incremental || subProject.isApplicationModule()) {
             subProject.plugins.apply(ComponentizationPlugin::class.java)
           }
@@ -61,6 +62,8 @@ class ComponentizationPlugin: Plugin<Project> {
         registerTransform(ComponentScanner(it))
       }
 
+      checkRegisterAndRebuildIfNeeded(it)
+
       if (!it.isApplicationModule()) {
         return@afterEvaluate
       }
@@ -68,7 +71,7 @@ class ComponentizationPlugin: Plugin<Project> {
       injectDependency(it)
       injectCompileOptions(it)
 
-      it.eachSubProject { subProject ->
+      it.effectSubModules { subProject ->
         project.addDependency("implementation", subProject)
         subProject.afterEvaluate {
           injectDependency(subProject)
@@ -81,13 +84,10 @@ class ComponentizationPlugin: Plugin<Project> {
         it.getBuildNames().forEach { buildName ->
           it.tasks.findByName("merge${buildName}JavaResource")?.apply {
             doFirst { _ ->
-              migrateProperties(it)
+              migrateRegisterFile2JavaResources(it, buildName)
             }
-            if (config.incremental) {
-              // 永远执行
-              setOnlyIf { true }
-              // 不做缓存
-              outputs.upToDateWhen { false }
+            if (config.incremental && !checkRegisterFileInvalidate(it, buildName)) {
+              invalidate()
             }
           }
         }
@@ -95,21 +95,65 @@ class ComponentizationPlugin: Plugin<Project> {
     }
   }
 
-  private fun migrateProperties(project: Project) {
-    // 同步module配置过程同步属性文件
+  /**
+   * 通过验证指定buildType资源文件Md5确定是否一致
+   */
+  private fun checkRegisterFileInvalidate(project: Project, buildName: String): Boolean {
+    project.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let {rootFile ->
+      if (!rootFile.exists()) {
+        return false
+      }
+      val rootMd5 = fileMD5(rootFile, false)
+      project.getBuildNames().find { it == buildName }?.let {
+        project.file(RESOURCES_OUTPUT_PREFIX)
+                .resolve(it).resolve("out")
+                .resolve(REGISTER_FILE_NAME).let {buildFile ->
+                  if (!buildFile.exists() || rootMd5 != fileMD5(buildFile, false)) {
+                    return false
+                  }
+                }
+      }
+    }
+    return true
+  }
+
+  /**
+   * 迁移注册文件到java_resource打包目录，为mergeJavaResources任务做准备
+   */
+  private fun migrateRegisterFile2JavaResources(project: Project, buildName: String) {
     project.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let {rootFile ->
       if (!rootFile.exists()) {
         println("migrateProperties: $rootFile is not exists...")
         return@let
       }
-      project.getBuildNames().forEach { buildName ->
+      project.getBuildNames().find { it == buildName }?.let {
         project.file(RESOURCES_OUTPUT_PREFIX)
-                .resolve(buildName).resolve("out")
+                .resolve(it).resolve("out")
                 .resolve(REGISTER_FILE_NAME).let {buildFile ->
                   rootFile.copyTo(buildFile, true)
                   println("migrateProperties: $rootFile to $buildFile ...")
                 }
       }
+    }
+  }
+
+  /**
+   * 检查注册文件的内容完整性，如果当前模块缺失，则启动重编译过程
+   */
+  private fun checkRegisterAndRebuildIfNeeded(project: Project) {
+    Properties().apply {
+      if (!project.isModule()) {
+        return
+      }
+      project.rootProject.file(config.resourcesDir).resolve(REGISTER_FILE_NAME).let { resourceFile ->
+        if (resourceFile.exists()) {
+          load(resourceFile.inputStream())
+        }
+      }
+      if (containsKey(project.name)) {
+        return
+      }
+      project.invalidateCache("^kapt.*Kotlin$", "^compile.*JavaWithJavac$")
     }
   }
 
@@ -155,7 +199,9 @@ class ComponentizationPlugin: Plugin<Project> {
     } != null
   }
 
-  private fun Project.eachSubProject(iterator: (subProject: Project) -> Unit) {
+  private fun Project.isModule() = isApplicationModule() || matchProject(config.includeModules, this)
+
+  private fun Project.effectSubModules(iterator: (subProject: Project) -> Unit) {
     subProjects {
       it.isApplicationModule() || matchProject(config.includeModules, it)
     }.forEach(iterator)
@@ -163,6 +209,25 @@ class ComponentizationPlugin: Plugin<Project> {
 
   private fun Project.isApplicationModule() = isApplication() || config.applicationModule == name
 
+}
+
+internal fun Task.invalidate() {
+  onlyIf { true }
+  outputs.upToDateWhen { false }
+}
+
+internal fun Project.invalidateCache(vararg taskNames: String) {
+  gradle.taskGraph.whenReady {
+    tasks.forEach { task ->
+      if (taskNames.isNullOrEmpty()) {
+        task.invalidate()
+      } else {
+        taskNames.find { it == task.name || it.toRegex().matches(task.name) }?.let {
+          task.invalidate()
+        }
+      }
+    }
+  }
 }
 
 internal fun Project.getBuildNames(): Set<String> {

@@ -5,6 +5,7 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.bhb.android.componentization.AutoWired
 import com.bhb.android.library.AppAPI
+import com.bhb.android.library.Library2
 
 class MainActivity: AppCompatActivity() {
 
@@ -22,5 +23,6 @@ class MainActivity: AppCompatActivity() {
       contextAPI.toast("I'm ContextAPI")
       dynamicAPI.abcd()
     }
+    Library2.invoke(this)
   }
 }

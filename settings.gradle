@@ -1,5 +1,6 @@
-include ':library'
 include ':app'
+include ':library'
+include ':library2'
 include ':annotation'
 include ':compiler'
 include ':componentization'
