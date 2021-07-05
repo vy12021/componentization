@@ -2,6 +2,7 @@
 组件化相关上下文自动化注册声明和使用注入插件
 
 ## [`设计文档`](https://github.com/vy12021/componentization/blob/dev_j11/%E8%AF%A6%E8%A7%A3Componentization%E5%BA%93%E6%B3%A8%E8%A7%A3.pdf)
+> 此文档从飞书导出的，由于和markdown兼容不是很好，只能导出为pdf文档，格式不太友好，凑合着看
 
 ### 目的
 1. 使用这种方式用来更好的面向接口编程
