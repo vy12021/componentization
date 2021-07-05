@@ -24,7 +24,7 @@ buildscript {
   repositories {
     maven {
       name "plugin"
-      url "https://nexus.bhbcode.com/repository/android-plugin/"
+      url "https://xxx.com/repository/android-plugin/"
       credentials {
         username mavenUsername
         password mavenPassword
@@ -36,7 +36,7 @@ buildscript {
   }
   
   dependencies {
-    classpath 'com.bhb.android.plugin:componentization:0.3.12'
+    classpath 'com.bhb.android.plugin:componentization:version'
   }
 }
 ```
