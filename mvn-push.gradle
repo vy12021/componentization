@@ -22,15 +22,15 @@ group = GROUP
 
 def getReleaseRepositoryUrl() {
   return hasProperty('RELEASE_REPOSITORY_URL') ? RELEASE_REPOSITORY_URL
-          : 'https://nexus.bhbcode.com/repository/android/'
+          : 'https://nexus.xxxx.com/repository/android/'
 }
 
 def getRepositoryUsername() {
-  return hasProperty('USERNAME') ? USERNAME : (hasProperty('NEXUS_USERNAME') ? NEXUS_USERNAME : 'liuyong')
+  return hasProperty('USERNAME') ? USERNAME : (hasProperty('NEXUS_USERNAME') ? NEXUS_USERNAME : '')
 }
 
 def getRepositoryPassword() {
-  return hasProperty('PASSWORD') ? PASSWORD : (hasProperty('NEXUS_PASSWORD') ? NEXUS_PASSWORD : 'Qzpm121121')
+  return hasProperty('PASSWORD') ? PASSWORD : (hasProperty('NEXUS_PASSWORD') ? NEXUS_PASSWORD : '')
 }
 
 afterEvaluate { project ->
